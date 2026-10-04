@@ -1,0 +1,26 @@
+{
+  "name": "WinGo Intelligence Studio",
+  "short_name": "WinGo 51Game",
+  "description": "WinGo Real-Time Prediction & Statistical Analysis Studio - Android Baseline (360x640 dp @ 3x)",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "categories": ["utilities", "finance", "tools"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

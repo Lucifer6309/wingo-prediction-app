@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>WinGo Live Real-Time Prediction & Analytics Studio</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Android Status Bar (Simulated Android Baseline 360 x 640 dp @ 3x) -->
+  <div class="android-status-bar" id="android-status-bar">
+    <div class="android-status-left">
+      <span class="android-clock" id="android-live-clock">09:41</span>
+    </div>
+    <div class="android-notch">
+      <span class="camera-lens"></span>
+      <span class="baseline-badge">360×640 dp (3x)</span>
+    </div>
+    <div class="android-status-right">
+      <span class="status-icon">📶 5G</span>
+      <span class="status-icon">🔋 100%</span>
+    </div>
+  </div>
+
+  <!-- App Header -->
+  <header class="glass-panel app-header">
+    <div class="brand-section">
+      <div class="brand-logo">W</div>
+      <div class="brand-info">
+        <h1>
+          WinGo Intelligence Studio
+          <span class="live-indicator">
+            <span class="live-dot"></span>
+            <span id="api-status-text">51Game Live Sync</span>
+          </span>
+        </h1>
+        <p>Live 4-Game Real-Time API Stream, Markov State Prediction & Strategy Backtesting</p>
+      </div>
+    </div>
+    
+    <div class="header-controls">
+      <!-- Quick Action Icons Toolbar -->
+      <div class="quick-icon-toolbar">
+        <button id="refresh-api-btn" class="control-btn icon-circle-btn active" title="Force Sync with 51Game API">
+          <span class="btn-icon">🔄</span> <span class="btn-text">Sync API</span>
+        </button>
+
+        <button id="toggle-sound-btn" class="control-btn icon-circle-btn" title="Toggle Sound FX">
+          <span id="sound-icon" class="btn-icon">🔊</span> <span id="sound-text" class="btn-text">Sound ON</span>
+        </button>
+
+        <button id="reset-btn" class="control-btn icon-circle-btn" title="Reset All Stats">
+          <span class="btn-icon">🗑️</span> <span class="btn-text">Reset</span>
+        </button>
+
+        <button id="view-mode-toggle-btn" class="control-btn icon-circle-btn" title="Toggle Android 360dp vs Desktop View">
+          <span id="view-mode-icon" class="btn-icon">📱</span> <span id="view-mode-text" class="btn-text">Android 360dp</span>
+        </button>
+      </div>
+
+      <!-- Mode Pill (Stream vs Manual) -->
+      <button id="mode-toggle-btn" class="control-btn mode-pill-btn active" title="Toggle Live Auto-Sync vs Manual Input">
+        <span class="btn-icon">📡</span> <span id="mode-label" class="btn-text">Mode: Real-Time Stream</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 4 Time Modes Navigation Tabs (30S, 1M, 3M, 5M) -->
+  <nav class="time-tabs-bar glass-panel" id="time-tabs-container">
+    <button class="time-tab-btn active" data-type="30" data-name="Win Go 30S" data-interval="30">
+      <div class="tab-icon">⚡</div>
+      <div class="tab-meta">
+        <span class="tab-title">Win Go 30S</span>
+        <span class="tab-sub">30 Seconds Cycle</span>
+      </div>
+    </button>
+    <button class="time-tab-btn" data-type="1" data-name="Win Go 1Min" data-interval="60">
+      <div class="tab-icon">⏱️</div>
+      <div class="tab-meta">
+        <span class="tab-title">Win Go 1Min</span>
+        <span class="tab-sub">1 Minute Cycle</span>
+      </div>
+    </button>
+    <button class="time-tab-btn" data-type="2" data-name="Win Go 3Min" data-interval="180">
+      <div class="tab-icon">⏳</div>
+      <div class="tab-meta">
+        <span class="tab-title">Win Go 3Min</span>
+        <span class="tab-sub">3 Minutes Cycle</span>
+      </div>
+    </button>
+    <button class="time-tab-btn" data-type="3" data-name="Win Go 5Min" data-interval="300">
+      <div class="tab-icon">🕒</div>
+      <div class="tab-meta">
+        <span class="tab-title">Win Go 5Min</span>
+        <span class="tab-sub">5 Minutes Cycle</span>
+      </div>
+    </button>
+  </nav>
+
+  <!-- Main Grid -->
+  <main class="dashboard-grid">
+    
+    <!-- Left Column: Live Round & AI Prediction -->
+    <div class="grid-col live-col">
+      
+      <!-- Live Timer Card -->
+      <section class="glass-panel timer-card" id="timer-section">
+        <div class="card-title">
+          <span id="active-game-title">Win Go 30S (Live)</span>
+          <span class="badge" id="sync-status-badge">REAL-TIME API</span>
+        </div>
+
+        <div class="period-display">
+          <span class="period-label">Current Period:</span>
+          <span class="period-value" id="current-period-text">Loading...</span>
+        </div>
+
+        <!-- Circular Dial -->
+        <div class="timer-dial-container">
+          <svg class="timer-svg" viewBox="0 0 160 160">
+            <circle class="timer-circle-bg" cx="80" cy="80" r="70" />
+            <circle id="timer-progress" class="timer-circle-progress" cx="80" cy="80" r="70" />
+          </svg>
+          <div class="timer-dial-content">
+            <div class="timer-time" id="countdown-text">00:30</div>
+            <div class="timer-status" id="timer-status-text">Betting Open</div>
+          </div>
+        </div>
+
+        <!-- Last Drawn Spotlight -->
+        <div class="last-outcome-banner">
+          <div>
+            <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Previous Draw</div>
+            <div style="font-size: 12px; font-weight: 700; font-family: var(--font-mono);" id="last-period-ref">#--</div>
+          </div>
+          <div id="last-ball-display" class="outcome-ball bg-green">?</div>
+          <div>
+            <div id="last-color-badge" class="color-badge bg-green">--</div>
+            <div id="last-size-badge" class="badge" style="margin-top: 4px; display: inline-block;">--</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Prediction Engine Card -->
+      <section class="glass-panel prediction-card" id="target-prediction-section">
+        <div class="card-title">
+          <span>Target Prediction (Next Draw)</span>
+          <span class="badge" id="pred-status-badge" style="background: rgba(0, 230, 118, 0.2); color: var(--color-green);">LIVE AI</span>
+        </div>
+
+        <div class="prediction-hero">
+          <div class="pred-label">Recommended Pick</div>
+          <div class="pred-primary-box">
+            <div id="pred-size-pill" class="pred-pill pill-big">BIG</div>
+          </div>
+          <div class="pred-confidence">
+            <div style="text-align: center;">
+              <span style="font-size: 10px; color: var(--text-dim); text-transform: uppercase; display: block;">CONFIDENCE</span>
+              <span id="pred-confidence-val" style="color: var(--color-cyan); font-family: var(--font-mono); font-size: 15px; font-weight: 800;">--%</span>
+            </div>
+            <div style="width: 1px; height: 20px; background: var(--border-color);"></div>
+            <div style="text-align: center;">
+              <span style="font-size: 10px; color: var(--text-dim); text-transform: uppercase; display: block;">CONFIRMATION</span>
+              <span id="target-confirmation-val" style="color: var(--color-gold); font-family: var(--font-mono); font-size: 15px; font-weight: 800;">--%</span>
+            </div>
+            <div style="width: 1px; height: 20px; background: var(--border-color);"></div>
+            <div style="text-align: center;">
+              <span style="font-size: 10px; color: var(--text-dim); text-transform: uppercase; display: block;">ACCURACY</span>
+              <span id="pred-accuracy-val" style="color: var(--color-green); font-family: var(--font-mono); font-size: 15px; font-weight: 800;">--%</span>
+            </div>
+          </div>
+
+          <!-- Target Prediction Confirmation Rate Meter -->
+          <div class="confirmation-meter-box">
+            <div class="confirmation-header-row">
+              <span class="confirmation-label">Target Confirmation Rate:</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span id="target-confirmation-rate-pct" class="confirmation-val-pct">--%</span>
+                <span id="target-confirmation-badge" class="badge" style="background: rgba(0, 230, 118, 0.2); color: var(--color-green); font-size: 10px; font-weight: 800;">CONFIRMED</span>
+              </div>
+            </div>
+            <div class="confirmation-bar-wrap">
+              <div id="target-confirmation-bar" class="confirmation-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div class="confirmation-detail-text">
+              <span id="target-confirmation-detail">Evaluating consensus models...</span>
+              <span id="target-confirmation-weighted" style="font-family: var(--font-mono); color: var(--color-gold); font-size: 10px;">Signal: --%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Color & Numbers Recommendation -->
+        <div class="pred-colors-bar">
+          <span style="color: var(--text-dim); font-size: 12px; font-weight: 700;">SUGGESTED COLOR:</span>
+          <span id="pred-color-badge" class="color-badge bg-green">GREEN (68%)</span>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <div style="font-size: 11px; color: var(--text-dim); font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">
+            High-Probability Numbers (Top 3):
+          </div>
+          <div class="rec-numbers-list" id="rec-numbers-container">
+            <div class="mini-num-pill">7</div>
+            <div class="mini-num-pill">9</div>
+            <div class="mini-num-pill">3</div>
+          </div>
+        </div>
+
+        <!-- Multi-Model Consensus Breakdown (50% Trend System + 50% Pattern/Reversion System) -->
+        <div style="font-size: 11px; color: var(--text-dim); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <span>Consensus Weights:</span>
+          <span style="color: var(--color-cyan); font-family: var(--font-mono); font-size: 10px;">50% TREND / 50% REVERSION</span>
+        </div>
+        <div class="models-breakdown">
+          <div class="model-row">
+            <span class="model-name">
+              Markov (Trend 25%):
+              <span id="confirm-markov" class="confirm-pill confirmed">✓</span>
+            </span>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="bar-markov" style="width: 72%;"></div>
+            </div>
+            <span class="model-val" id="val-markov">72%</span>
+          </div>
+          <div class="model-row">
+            <span class="model-name">
+              Dragon / Streak (Trend 25%):
+              <span id="confirm-streak" class="confirm-pill confirmed">✓</span>
+            </span>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="bar-streak" style="width: 65%;"></div>
+            </div>
+            <span class="model-val" id="val-streak">65%</span>
+          </div>
+          <div class="model-row">
+            <span class="model-name">
+              Pattern Matcher (Cycle 25%):
+              <span id="confirm-pattern" class="confirm-pill confirmed">✓</span>
+            </span>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="bar-pattern" style="width: 80%;"></div>
+            </div>
+            <span class="model-val" id="val-pattern">80%</span>
+          </div>
+          <div class="model-row">
+            <span class="model-name">
+              Mean Reversion (Cycle 25%):
+              <span id="confirm-freq" class="confirm-pill divergent">✗</span>
+            </span>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="bar-freq" style="width: 58%;"></div>
+            </div>
+            <span class="model-val" id="val-freq">58%</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+          <span style="color: var(--text-dim);">Last Round Call:</span>
+          <span id="last-prediction-result" class="pred-result-win">PENDING</span>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Center Column: Statistical Dashboard & Probability Analytics -->
+    <div class="grid-col analytics-col" id="analytics-section">
+      
+      <!-- Performance KPIs -->
+      <div class="stats-kpi-grid">
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">Win Rate</div>
+          <div class="kpi-value" id="kpi-winrate" style="color: var(--color-green);">0.0%</div>
+          <div class="kpi-sub" id="kpi-win-counts">0 Won / 100 Audited</div>
+        </div>
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">Simulated P/L</div>
+          <div class="kpi-value" id="kpi-profit" style="color: var(--color-gold);">+0 U</div>
+          <div class="kpi-sub" id="kpi-bet-strategy">Flat 1 Unit</div>
+        </div>
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">Max Win Streak</div>
+          <div class="kpi-value" id="kpi-max-streak" style="color: var(--color-cyan);">0</div>
+          <div class="kpi-sub" id="kpi-current-streak">Current Streak: 0</div>
+        </div>
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">Live Rounds</div>
+          <div class="kpi-value" id="kpi-rounds" style="color: #fff;">0</div>
+          <div class="kpi-sub">51Game History Log</div>
+        </div>
+      </div>
+
+      <!-- Ratio Distribution (Probabilities Gauge) -->
+      <section class="glass-panel chart-card" style="margin-bottom: 20px;">
+        <div class="card-title">
+          <span>Ratio Distribution</span>
+          <span class="badge">Probabilities</span>
+        </div>
+        
+        <div class="dist-metric-group">
+          <div>
+            <div class="dist-bar-header">
+              <span style="color: var(--color-gold);">Big: <strong id="ratio-big-text">50%</strong></span>
+              <span style="color: var(--color-cyan);">Small: <strong id="ratio-small-text">50%</strong></span>
+            </div>
+            <div class="dual-progress-bar">
+              <div class="dp-part-big" id="bar-ratio-big" style="width: 50%;"></div>
+              <div class="dp-part-small" id="bar-ratio-small" style="width: 50%;"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="dist-bar-header">
+              <span style="color: var(--color-green);">Green: <strong id="ratio-green-text">40%</strong></span>
+              <span style="color: var(--color-red);">Red: <strong id="ratio-red-text">40%</strong></span>
+              <span style="color: var(--color-violet);">Violet: <strong id="ratio-violet-text">20%</strong></span>
+            </div>
+            <div class="tri-progress-bar">
+              <div class="tp-part-green" id="bar-ratio-green" style="width: 40%;"></div>
+              <div class="tp-part-red" id="bar-ratio-red" style="width: 40%;"></div>
+              <div class="tp-part-violet" id="bar-ratio-violet" style="width: 20%;"></div>
+            </div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">
+            * Real 51Game distribution over the active historical window.
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Right Column: Operations, Manual Entry & Strategy -->
+    <div class="grid-col operations-col" id="operations-section">
+      
+      <!-- Manual Entry / Live Sync from 51Game -->
+      <section class="glass-panel operations-card">
+        <div class="card-title">
+          <span>Manual Entry / Quick Log</span>
+          <span class="badge">Direct Injection</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+          Want to inject an outcome manually? Click any number below:
+        </p>
+
+        <div class="keypad-grid">
+          <button class="keypad-btn" data-val="0" data-color="violet-red">0</button>
+          <button class="keypad-btn" data-val="1" data-color="green">1</button>
+          <button class="keypad-btn" data-val="2" data-color="red">2</button>
+          <button class="keypad-btn" data-val="3" data-color="green">3</button>
+          <button class="keypad-btn" data-val="4" data-color="red">4</button>
+          <button class="keypad-btn" data-val="5" data-color="violet-green">5</button>
+          <button class="keypad-btn" data-val="6" data-color="red">6</button>
+          <button class="keypad-btn" data-val="7" data-color="green">7</button>
+          <button class="keypad-btn" data-val="8" data-color="red">8</button>
+          <button class="keypad-btn" data-val="9" data-color="green">9</button>
+        </div>
+
+        <div class="input-row">
+          <input type="text" id="manual-period-input" class="text-input" placeholder="Custom Period ID (Optional)">
+          <button id="add-manual-btn" class="btn-primary">Add Draw</button>
+        </div>
+      </section>
+
+      <!-- Risk & Betting Strategy Simulator -->
+      <section class="glass-panel operations-card">
+        <div class="card-title">
+          <span>Money Management Simulator</span>
+          <span class="badge">Virtual Units</span>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label style="font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 4px;">STAKING STRATEGY:</label>
+          <select id="staking-select" class="text-input" style="width: 100%;">
+            <option value="flat">Flat Staking (1 Unit Fixed)</option>
+            <option value="martingale-3">3-Stage Martingale (1 -> 2 -> 4)</option>
+            <option value="paroli">Paroli / Anti-Martingale (Win-Streak)</option>
+            <option value="dalembert">D'Alembert (Balanced +/- 1 Unit)</option>
+          </select>
+        </div>
+
+        <div style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Current Stake:</span>
+            <strong id="strategy-current-stake" style="color: var(--color-gold);">1 Unit</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Max Drawdown:</span>
+            <strong id="strategy-max-drawdown" style="color: var(--color-red);">0 Units</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Model Parameters -->
+      <section class="glass-panel operations-card">
+        <div class="card-title">
+          <span>Algorithm Fine-Tuning</span>
+          <span class="badge">Config</span>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+            <span style="color: var(--text-dim);">Lookback Window:</span>
+            <strong id="lookback-val-text" style="color: var(--color-cyan);">500 Rounds</strong>
+          </div>
+          <input type="range" id="lookback-slider" min="50" max="500" step="25" value="500" style="width: 100%; accent-color: var(--color-cyan);">
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+            <span style="color: var(--text-dim);">Trend vs Mean Reversion:</span>
+            <strong id="bias-val-text" style="color: var(--color-green);">Balanced (50/50)</strong>
+          </div>
+          <input type="range" id="bias-slider" min="0" max="100" step="10" value="50" style="width: 100%; accent-color: var(--color-green);">
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Historical Table Section -->
+  <section class="glass-panel history-section" id="history-section">
+    <div class="table-header-bar">
+      <div>
+        <h2 style="font-size: 16px; font-weight: 800;">Real-Time 51Game Draw History & Prediction Audit</h2>
+        <p style="font-size: 12px; color: var(--text-muted);">Real-world draw outcomes received from 51Game API against model predictions</p>
+      </div>
+
+      <div class="filter-group">
+        <div class="scope-toggle" id="scope-toggle-bar">
+          <button class="scope-btn" data-scope="50" id="scope-50-btn">50 Recs</button>
+          <button class="scope-btn active" data-scope="100" id="scope-100-btn">100 Audit</button>
+          <button class="scope-btn" data-scope="500" id="scope-500-btn">500 All</button>
+        </div>
+        <div class="filter-chips-row" id="filter-chips-row">
+          <button class="filter-btn active" data-filter="all">🎯 All</button>
+          <button class="filter-btn" data-filter="big">🟡 Big</button>
+          <button class="filter-btn" data-filter="small">🔵 Small</button>
+          <button class="filter-btn" data-filter="green">🟢 Green</button>
+          <button class="filter-btn" data-filter="red">🔴 Red</button>
+          <button id="export-csv-btn" class="filter-btn export-chip" style="color: var(--color-gold);">📥 CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Period ID</th>
+            <th>Drawn Number</th>
+            <th>Big / Small</th>
+            <th>Color</th>
+            <th>Target Prediction</th>
+            <th>Accuracy Call</th>
+            <th>Stake Unit</th>
+            <th>Simulated P/L</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody">
+          <!-- Populated dynamically from Real-Time 51Game API -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination Controls (10 Records Per Page, 50 Total) -->
+    <div class="pagination-bar">
+      <div class="pagination-info" id="pagination-info-text">
+        Showing 1 - 10 of 50 Records (Page 1 of 5)
+      </div>
+      <div class="pagination-controls">
+        <button class="page-nav-btn" id="page-prev-btn" disabled>◀ Previous</button>
+        <div class="page-numbers-group" id="page-numbers-group">
+          <!-- Dynamically generated page buttons: 1, 2, 3, 4, 5 -->
+        </div>
+        <button class="page-nav-btn" id="page-next-btn">Next ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mathematical & Risk Disclaimer -->
+  <aside class="glass-panel disclaimer-card">
+    <h3>
+      <span>⚠️</span> Probability Analysis & Mathematical Reality
+    </h3>
+    <p>
+      Win Go (30S, 1M, 3M, 5M) is a rapid lottery game with outcomes generated on the server using pseudo-random number generation (PRNG). 
+      Each round is an independent trial. In probability mathematics, past outcomes do not alter future probabilities (the <strong>Gambler's Fallacy</strong>). 
+      This studio provides real-time tracking, Markov state analysis, and pattern identification for study and educational simulation. 
+      No algorithm can guarantee random lottery outcomes.
+    </p>
+  </aside>
+
+  <!-- Mobile Bottom Sticky Navigation Bar -->
+  <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+    <button class="mobile-nav-btn active" data-target="target-prediction-section">
+      <span class="mobile-nav-icon">🎯</span>
+      <span class="mobile-nav-lbl">Predict</span>
+    </button>
+    <button class="mobile-nav-btn" data-target="timer-section">
+      <span class="mobile-nav-icon">⏱️</span>
+      <span class="mobile-nav-lbl">Timer</span>
+    </button>
+    <button class="mobile-nav-btn" data-target="analytics-section">
+      <span class="mobile-nav-icon">📊</span>
+      <span class="mobile-nav-lbl">Stats</span>
+    </button>
+    <button class="mobile-nav-btn" data-target="history-section">
+      <span class="mobile-nav-icon">📜</span>
+      <span class="mobile-nav-lbl">History</span>
+    </button>
+    <button class="mobile-nav-btn" data-target="operations-section">
+      <span class="mobile-nav-icon">⚙️</span>
+      <span class="mobile-nav-lbl">Manage</span>
+    </button>
+  </nav>
+
+  <!-- Android System Navigation Gesture Bar -->
+  <div class="android-gesture-bar-container" id="android-gesture-bar-container">
+    <div class="android-gesture-bar"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.log('SW registration error:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
