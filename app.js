@@ -1085,12 +1085,33 @@ class WinGoApp {
         progressCircle.className = 'timer-circle-progress';
       }
 
-      // On boundary zero: trigger live fetch
-      if (remSecs === 0 && lastSecond === 1) {
-        this.syncLiveDraws();
+      // On boundary zero or final seconds: trigger immediate rapid-poll
+      if (remSecs <= 1 && lastSecond > 1) {
+        this.triggerImmediateResultPoll();
+      } else if (remSecs === 0 && lastSecond === 1) {
+        this.triggerImmediateResultPoll();
       }
 
       lastSecond = remSecs;
+    }, 1000);
+  }
+
+  triggerImmediateResultPoll() {
+    if (this.fastSyncActive) return;
+    this.fastSyncActive = true;
+    let attempts = 0;
+    const maxAttempts = 10;
+    const initialLatest = this.gameStates[this.activeTypeId]?.history[0]?.period;
+
+    const fastTimer = setInterval(async () => {
+      attempts++;
+      const isNew = await this.syncLiveDraws();
+      const currentLatest = this.gameStates[this.activeTypeId]?.history[0]?.period;
+
+      if ((initialLatest && currentLatest && currentLatest !== initialLatest) || isNew || attempts >= maxAttempts) {
+        clearInterval(fastTimer);
+        this.fastSyncActive = false;
+      }
     }, 1000);
   }
 
@@ -1102,7 +1123,9 @@ class WinGoApp {
     if (window.location.protocol.startsWith('http')) {
       candidates.push(window.location.origin);
     }
-    candidates.push('http://localhost:8088', 'http://127.0.0.1:8088', 'http://localhost:8080', 'http://localhost:8089');
+    const hostWithPort = window.location.hostname ? `http://${window.location.hostname}:8088` : null;
+    if (hostWithPort && !candidates.includes(hostWithPort)) candidates.push(hostWithPort);
+    candidates.push('http://localhost:8088', 'http://127.0.0.1:8088', 'http://localhost:8089');
 
     for (const host of candidates) {
       try {
@@ -1114,7 +1137,7 @@ class WinGoApp {
             this.isApiConnected = true;
             document.getElementById('api-status-text').textContent = `51Game Live (${host.replace('http://', '')})`;
             document.getElementById('sync-status-badge').textContent = 'LIVE API SYNCED';
-            return;
+            return true;
           }
         }
       } catch (e) {}
@@ -1123,18 +1146,22 @@ class WinGoApp {
     // Fallback indicator
     document.getElementById('api-status-text').textContent = 'Epoch Real-Time Sync';
     document.getElementById('sync-status-badge').textContent = 'REAL-TIME EPOCH';
+    return false;
   }
 
   async syncLiveDraws() {
-    if (!this.apiBaseUrl) return;
+    if (!this.apiBaseUrl) {
+      await this.discoverApiBridge();
+      if (!this.apiBaseUrl) return false;
+    }
 
     try {
       const typeId = this.activeTypeId;
       const res = await fetch(`${this.apiBaseUrl}/api/wingo/history?typeId=${typeId}&pageSize=1000&pageNo=1`, { cache: 'no-store' });
-      if (!res.ok) return;
+      if (!res.ok) return false;
 
       const json = await res.json();
-      if (!json || !json.data || !Array.isArray(json.data.list)) return;
+      if (!json || !json.data || !Array.isArray(json.data.list)) return false;
 
       const rawList = json.data.list;
       const currentState = this.gameStates[typeId];
@@ -1158,9 +1185,11 @@ class WinGoApp {
       if (parsedDraws.length > 0) {
         const latest = parsedDraws[0];
         const prevTop = currentState.history[0];
+        let isNewDraw = false;
 
         // If new draw arrived
         if (prevTop && latest.period !== prevTop.period) {
+          isNewDraw = true;
           this.auditNewDrawnResult(latest);
         }
 
@@ -1180,21 +1209,25 @@ class WinGoApp {
         this.backtestHistory(currentState);
 
         // Also fetch active period issue
-        const issueRes = await fetch(`${this.apiBaseUrl}/api/wingo/issue?typeId=${typeId}`, { cache: 'no-store' });
-        if (issueRes.ok) {
-          const issueJson = await issueRes.json();
-          if (issueJson && issueJson.data && issueJson.data.issueNumber) {
-            currentState.currentPeriod = issueJson.data.issueNumber;
-            document.getElementById('current-period-text').textContent = currentState.currentPeriod;
+        try {
+          const issueRes = await fetch(`${this.apiBaseUrl}/api/wingo/issue?typeId=${typeId}`, { cache: 'no-store' });
+          if (issueRes.ok) {
+            const issueJson = await issueRes.json();
+            if (issueJson && issueJson.data && issueJson.data.issueNumber && issueJson.data.issueNumber !== 'Loading...') {
+              currentState.currentPeriod = issueJson.data.issueNumber;
+              document.getElementById('current-period-text').textContent = currentState.currentPeriod;
+            }
           }
-        }
+        } catch (e) {}
 
         this.updateActivePrediction();
         this.render();
+        return isNewDraw;
       }
     } catch (err) {
       console.warn("Live sync error:", err);
     }
+    return false;
   }
 
   backtestHistory(currentState) {
@@ -1293,9 +1326,14 @@ class WinGoApp {
 
   startApiPollingLoop() {
     if (this.apiSyncInterval) clearInterval(this.apiSyncInterval);
-    this.apiSyncInterval = setInterval(() => {
-      this.syncLiveDraws();
-    }, 3000);
+    this.apiSyncInterval = setInterval(async () => {
+      if (!this.isApiConnected || !this.apiBaseUrl) {
+        await this.discoverApiBridge();
+      }
+      if (this.isApiConnected && !this.fastSyncActive) {
+        await this.syncLiveDraws();
+      }
+    }, 2500);
   }
 
   injectManualDraw(number, customPeriod = null) {
