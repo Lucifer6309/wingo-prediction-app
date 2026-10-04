@@ -777,8 +777,37 @@ class WinGoApp {
     }
   }
 
+  updateIndianStandardTime() {
+    const clockEl = document.getElementById('top-live-ist-time');
+    if (!clockEl) return;
+    try {
+      const now = new Date();
+      // 12-hour format with AM/PM in Indian Standard Time (IST)
+      const timeStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }).format(now);
+      clockEl.textContent = timeStr;
+    } catch (e) {
+      // Fallback in case of environment missing timezone data
+      const now = new Date();
+      const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const istDate = new Date(utcMs + (330 * 60000));
+      let h = istDate.getHours();
+      const m = String(istDate.getMinutes()).padStart(2, '0');
+      const s = String(istDate.getSeconds()).padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      clockEl.textContent = `${h}:${m}:${s} ${ampm}`;
+    }
+  }
+
   async init() {
     this.initViewMode();
+    this.updateIndianStandardTime();
     this.bindEvents();
     this.setupTabs();
 
@@ -1009,6 +1038,7 @@ class WinGoApp {
     let lastSecond = -1;
 
     this.timerTickInterval = setInterval(() => {
+      this.updateIndianStandardTime();
       const epoch = getEpochPeriodInfo(this.activeTypeId);
       const currentState = this.gameStates[this.activeTypeId];
       
