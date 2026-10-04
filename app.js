@@ -777,19 +777,8 @@ class WinGoApp {
     }
   }
 
-  updateAndroidClock() {
-    const clockEl = document.getElementById('android-live-clock');
-    if (clockEl) {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      clockEl.textContent = `${h}:${m}`;
-    }
-  }
-
   async init() {
     this.initViewMode();
-    this.updateAndroidClock();
     this.bindEvents();
     this.setupTabs();
 
@@ -1020,7 +1009,6 @@ class WinGoApp {
     let lastSecond = -1;
 
     this.timerTickInterval = setInterval(() => {
-      this.updateAndroidClock();
       const epoch = getEpochPeriodInfo(this.activeTypeId);
       const currentState = this.gameStates[this.activeTypeId];
       

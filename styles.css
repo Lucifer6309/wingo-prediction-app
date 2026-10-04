@@ -1268,7 +1268,6 @@ body {
 
 /* Bottom Navigation & Gesture Bar (Hidden on standard desktop widescreen) */
 .mobile-bottom-nav,
-.android-status-bar,
 .android-gesture-bar-container {
   display: none;
 }
@@ -1305,60 +1304,6 @@ body.mobile-view #operations-section {
   scroll-margin-top: 14px;
 }
 
-/* Android Status Bar */
-body.mobile-view .android-status-bar {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  padding: 6px 10px 8px 10px !important;
-  font-family: var(--font-mono) !important;
-  font-size: 11px !important;
-  color: var(--text-muted) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
-  margin-bottom: 10px !important;
-  user-select: none !important;
-  width: 100% !important;
-}
-
-body.mobile-view .android-clock {
-  font-weight: 700;
-  color: var(--text-main);
-  font-size: 12px;
-}
-
-body.mobile-view .android-notch {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-body.mobile-view .camera-lens {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #000;
-  border: 1.5px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 0 4px rgba(0, 229, 255, 0.5);
-}
-
-body.mobile-view .baseline-badge {
-  font-size: 9px;
-  font-weight: 800;
-  color: var(--color-cyan);
-  background: rgba(0, 229, 255, 0.12);
-  border: 1px solid rgba(0, 229, 255, 0.3);
-  padding: 1px 6px;
-  border-radius: 8px;
-  letter-spacing: 0.3px;
-}
-
-body.mobile-view .android-status-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
 
 /* App Header in Mobile View */
 body.mobile-view .app-header {
@@ -1885,20 +1830,6 @@ body.mobile-view .android-gesture-bar {
   #history-section,
   #operations-section {
     scroll-margin-top: 14px;
-  }
-
-  .android-status-bar {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 6px 10px 8px 10px !important;
-    font-family: var(--font-mono) !important;
-    font-size: 11px !important;
-    color: var(--text-muted) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
-    margin-bottom: 10px !important;
-    user-select: none !important;
-    width: 100% !important;
   }
 
   .app-header {
