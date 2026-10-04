@@ -333,19 +333,11 @@ class PredictionEngine {
     }
     const confidence = Math.max(56, Math.min(95, dynamicConf));
 
-    // Color Pick: Balanced 50% Color Markov + 50% Color Frequency Reversion
-    const colorMarkov = this.calcColorMarkov(windowData, lastResult);
-    const greenCount = windowData.filter(d => [1, 3, 7, 9, 5].includes(d.number)).length;
-    const redCount = windowData.filter(d => [2, 4, 6, 8, 0].includes(d.number)).length;
-    const colorFreqPick = redCount < greenCount ? 'RED' : 'GREEN';
-    const colorFreqProb = Math.min(85, Math.round(((colorFreqPick === 'RED' ? greenCount : redCount) / windowData.length) * 100));
-
-    let colorPick = colorMarkov.predicted;
-    let colorConfidence = Math.round((colorMarkov.prob * 0.50) + (colorFreqProb * 0.50));
-    if (colorConfidence < 52) {
-      colorPick = colorFreqPick;
-      colorConfidence = colorFreqProb;
-    }
+    // Dynamic Multi-Model Color Prediction Engine
+    const colorAnalysis = this.predictColor(windowData, lastResult, primaryPick);
+    const colorPick = colorAnalysis.colorPick;
+    const colorConfidence = colorAnalysis.colorConfidence;
+    const hasVioletHedge = colorAnalysis.hasVioletHedge;
 
     // Number Recommendations: 50% Category Alignment + 50% Cold Frequency Reversion
     const recNumbers = this.getRecommendedNumbers(freqResult, primaryPick, colorPick);
@@ -360,7 +352,8 @@ class PredictionEngine {
       totalModels,
       modelConfirmations,
       colorPick,
-      colorConfidence: Math.max(55, Math.min(85, colorConfidence)),
+      colorConfidence,
+      hasVioletHedge,
       recNumbers,
       markovScore: Math.round(markovResult.prob),
       streakScore: Math.round(streakResult.prob),
@@ -563,27 +556,107 @@ class PredictionEngine {
     };
   }
 
-  calcColorMarkov(windowData, lastResult) {
-    let gToG = 0, gToR = 0, rToG = 0, rToR = 0;
-    for (let i = 0; i < windowData.length - 1; i++) {
-      const prevColor = [1, 3, 7, 9, 5].includes(windowData[i + 1].number) ? 'GREEN' : 'RED';
-      const currColor = [1, 3, 7, 9, 5].includes(windowData[i].number) ? 'GREEN' : 'RED';
-      if (prevColor === 'GREEN') {
-        if (currColor === 'GREEN') gToG++; else gToR++;
-      } else {
-        if (currColor === 'GREEN') rToG++; else rToR++;
-      }
+  predictColor(windowData, lastResult, primaryPick) {
+    if (!windowData || windowData.length < 5) {
+      return { colorPick: primaryPick === 'BIG' ? 'GREEN' : 'RED', colorConfidence: 65, hasVioletHedge: false };
     }
-    const lastColor = [1, 3, 7, 9, 5].includes(lastResult.number) ? 'GREEN' : 'RED';
-    if (lastColor === 'GREEN') {
-      const tot = gToG + gToR || 1;
-      const probG = (gToG / tot) * 100;
-      return { predicted: probG >= 50 ? 'GREEN' : 'RED', prob: Math.max(probG, 100 - probG) };
+
+    const recent = windowData.slice(0, 35);
+    const colors = recent.map(d => [1, 3, 7, 9, 5].includes(d.number) ? 'GREEN' : 'RED');
+
+    // 1. Color Streak Momentum & Exhaustion Analyzer (Weight 30%)
+    let currentStreakColor = colors[0];
+    let streakCount = 0;
+    for (let c of colors) {
+      if (c === currentStreakColor) streakCount++; else break;
+    }
+
+    let streakVote = currentStreakColor;
+    let streakConfidence = 56;
+    if (streakCount === 1) {
+      streakVote = currentStreakColor;
+      streakConfidence = 62;
+    } else if (streakCount === 2) {
+      // 2 consecutive: strong momentum continuation
+      streakVote = currentStreakColor;
+      streakConfidence = 68;
+    } else if (streakCount === 3) {
+      // 3 consecutive: mature dragon, slight exhaustion transition
+      streakVote = currentStreakColor === 'GREEN' ? 'RED' : 'GREEN';
+      streakConfidence = 64;
     } else {
-      const tot = rToG + rToR || 1;
-      const probG = (rToG / tot) * 100;
-      return { predicted: probG >= 50 ? 'GREEN' : 'RED', prob: Math.max(probG, 100 - probG) };
+      // 4+ consecutive: severe streak exhaustion (mean-reversion pull)
+      streakVote = currentStreakColor === 'GREEN' ? 'RED' : 'GREEN';
+      streakConfidence = Math.min(86, 68 + (streakCount - 3) * 6);
     }
+
+    // 2. Harmonic Color Ping-Pong Oscillation (Weight 25%)
+    let alternations = 0;
+    const testLen = Math.min(12, colors.length - 1);
+    for (let i = 0; i < testLen; i++) {
+      if (colors[i] !== colors[i + 1]) alternations++;
+    }
+    const altRate = alternations / testLen;
+    let cycleVote = colors[0] === 'GREEN' ? 'RED' : 'GREEN';
+    let cycleConfidence = Math.round(52 + (altRate * 36));
+
+    // 3. Short-Term Color RSI (14 periods) (Weight 25%)
+    const rsiWindow = colors.slice(0, Math.min(14, colors.length));
+    const greenRsiCount = rsiWindow.filter(c => c === 'GREEN').length;
+    const greenRsi = (greenRsiCount / (rsiWindow.length || 1)) * 100;
+    let rsiVote = 'GREEN';
+    let rsiConfidence = 55;
+    if (greenRsi >= 64) {
+      // Green overbought -> Mean reversion to RED
+      rsiVote = 'RED';
+      rsiConfidence = Math.min(84, 58 + Math.round((greenRsi - 60) * 1.5));
+    } else if (greenRsi <= 36) {
+      // Green oversold -> Mean reversion to GREEN
+      rsiVote = 'GREEN';
+      rsiConfidence = Math.min(84, 58 + Math.round((40 - greenRsi) * 1.5));
+    } else {
+      rsiVote = greenRsi >= 50 ? 'GREEN' : 'RED';
+      rsiConfidence = 56;
+    }
+
+    // 4. Primary Pick Correlation (Weight 20%)
+    // BIG numbers: 5(G), 7(G), 9(G) vs 6(R), 8(R) -> 60% Green bias
+    // SMALL numbers: 0(R), 2(R), 4(R) vs 1(G), 3(G) -> 60% Red bias
+    const alignVote = primaryPick === 'BIG' ? 'GREEN' : 'RED';
+    const alignConfidence = 64;
+
+    // Weighted Consensus Aggregator
+    let greenTally = 0;
+    let redTally = 0;
+
+    const tally = (vote, conf, weight) => {
+      if (vote === 'GREEN') {
+        greenTally += conf * weight;
+        redTally += (100 - conf) * weight;
+      } else {
+        redTally += conf * weight;
+        greenTally += (100 - conf) * weight;
+      }
+    };
+
+    tally(streakVote, streakConfidence, 0.30);
+    tally(cycleVote, cycleConfidence, 0.25);
+    tally(rsiVote, rsiConfidence, 0.25);
+    tally(alignVote, alignConfidence, 0.20);
+
+    const totalTally = greenTally + redTally || 1;
+    const finalGreenPct = (greenTally / totalTally) * 100;
+
+    const colorPick = finalGreenPct >= 50 ? 'GREEN' : 'RED';
+    const rawConf = colorPick === 'GREEN' ? finalGreenPct : (100 - finalGreenPct);
+    const colorConfidence = Math.max(58, Math.min(88, Math.round(rawConf)));
+
+    // Check Violet Due / Hedge (0 and 5)
+    const last10Numbers = recent.slice(0, 10).map(d => d.number);
+    const hasRecentViolet = last10Numbers.some(n => n === 0 || n === 5);
+    const hasVioletHedge = !hasRecentViolet; // Due for violet hedge if no 0 or 5 in last 10 draws
+
+    return { colorPick, colorConfidence, hasVioletHedge };
   }
 
   getRecommendedNumbers(freqResult, primaryPick, colorPick) {
@@ -1501,8 +1574,11 @@ class WinGoApp {
     }
 
     const colorBadge = document.getElementById('pred-color-badge');
-    colorBadge.textContent = `${pred.colorPick} (${pred.colorConfidence}%)`;
-    colorBadge.className = pred.colorPick === 'GREEN' ? 'color-badge bg-green' : 'color-badge bg-red';
+    if (colorBadge && pred.colorPick) {
+      const hedgeTag = pred.hasVioletHedge ? ' <span style="font-size: 10px; opacity: 0.9; margin-left: 4px;">(+VIOLET)</span>' : '';
+      colorBadge.innerHTML = `${pred.colorPick} (${pred.colorConfidence}%)${hedgeTag}`;
+      colorBadge.className = pred.colorPick === 'GREEN' ? 'color-badge bg-green' : 'color-badge bg-red';
+    }
 
     const numbersContainer = document.getElementById('rec-numbers-container');
     numbersContainer.innerHTML = '';
