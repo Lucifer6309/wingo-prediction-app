@@ -151,7 +151,7 @@ class SoundEngine {
 // ==========================================
 class PredictionEngine {
   constructor() {
-    this.lookbackWindow = 1000;
+    this.lookbackWindow = 600;
     this.trendBias = 50; // 0 (100% Reversion) to 100 (100% Trend)
   }
 
@@ -712,7 +712,7 @@ class WinGoApp {
       const datePart = epoch.periodId.slice(0, 8);
 
       const list = [];
-      for (let i = 1; i <= 1000; i++) {
+      for (let i = 1; i <= 600; i++) {
         const num = Math.floor(Math.random() * 10);
         const details = getNumberDetails(num);
         const seq = Math.max(1, currentSeq - i);
@@ -1157,7 +1157,7 @@ class WinGoApp {
 
     try {
       const typeId = this.activeTypeId;
-      const res = await fetch(`${this.apiBaseUrl}/api/wingo/history?typeId=${typeId}&pageSize=1000&pageNo=1`, { cache: 'no-store' });
+      const res = await fetch(`${this.apiBaseUrl}/api/wingo/history?typeId=${typeId}&pageSize=600&pageNo=1`, { cache: 'no-store' });
       if (!res.ok) return false;
 
       const json = await res.json();

@@ -142,10 +142,10 @@ class HistoryManager:
                                 if it['issueNumber'] not in seen:
                                     seen.add(it['issueNumber'])
                                     unique_list.append(it)
-                            entry['list'] = sorted(unique_list, key=lambda x: str(x['issueNumber']), reverse=True)[:1000]
+                            entry['list'] = sorted(unique_list, key=lambda x: str(x['issueNumber']), reverse=True)[:600]
 
-                    # Trigger polite background backfill to 1000 if not done yet
-                    if len(entry['list']) < 900 and not entry['is_backfilling'] and page_size > 100:
+                    # Trigger polite background backfill to 600 if not done yet
+                    if len(entry['list']) < 550 and not entry['is_backfilling'] and page_size > 100:
                         entry['is_backfilling'] = True
                         threading.Thread(target=self._backfill_worker, args=(type_id,), daemon=True).start()
 
@@ -160,7 +160,7 @@ class HistoryManager:
 
     def _backfill_worker(self, type_id):
         try:
-            for p_num in range(2, 11):
+            for p_num in range(2, 7):
                 time.sleep(0.3)
                 try:
                     res = fetch_signed_51game_api('/GetNoaverageEmerdList', {
@@ -184,7 +184,7 @@ class HistoryManager:
                                     if it['issueNumber'] not in seen:
                                         seen.add(it['issueNumber'])
                                         unique_list.append(it)
-                                entry['list'] = sorted(unique_list, key=lambda x: str(x['issueNumber']), reverse=True)[:1000]
+                                entry['list'] = sorted(unique_list, key=lambda x: str(x['issueNumber']), reverse=True)[:600]
                 except Exception as ex:
                     print(f"Backfill page {p_num} skipped: {ex}")
                     time.sleep(1.0)
@@ -228,11 +228,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response(200, {'code': 0, 'msg': 'Fallback', 'data': {'issueNumber': 'Loading...'}})
             return
 
-        # Proxy: Get Live Draw History (Supports up to 1000 periods)
+        # Proxy: Get Live Draw History (Supports up to 600 periods)
         if parsed.path == '/api/wingo/history':
             params = parse_qs(parsed.query)
             type_id = int(params.get('typeId', [30])[0])
-            page_size = int(params.get('pageSize', [1000])[0])
+            page_size = int(params.get('pageSize', [600])[0])
             page_no = int(params.get('pageNo', [1])[0])
             try:
                 data = history_mgr.get_history(type_id, page_size, page_no)
@@ -298,7 +298,7 @@ def run_server():
         print(f">> PC Local URL:       {url}")
         print(f">> Android Mobile URL: {mobile_url}")
         print("   (Open this Mobile URL in Chrome on your Android phone!)")
-        print(">> Analysis Engine: 1000 Historical Periods / 300-Round Audit")
+        print(">> Analysis Engine: 600 Historical Periods / 300-Round Audit")
         print(">> Android PWA Install: Ready (manifest.json + sw.js)")
         print("Press Ctrl+C to stop the server.")
         print("=" * 65)
