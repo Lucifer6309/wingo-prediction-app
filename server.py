@@ -81,15 +81,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response(500, {'code': -1, 'msg': str(e)})
             return
 
-        # Proxy: Get Live Draw History (Supports up to 500 periods)
+        # Proxy: Get Live Draw History (Supports up to 1000 periods for deep analysis)
         if parsed.path == '/api/wingo/history':
             params = parse_qs(parsed.query)
             type_id = int(params.get('typeId', [30])[0])
-            page_size = int(params.get('pageSize', [500])[0])
+            page_size = int(params.get('pageSize', [1000])[0])
             page_no = int(params.get('pageNo', [1])[0])
             try:
                 if page_size > 100:
-                    pages_to_fetch = min(5, (page_size + 99) // 100)
+                    pages_to_fetch = min(10, (page_size + 99) // 100)
                     from concurrent.futures import ThreadPoolExecutor
 
                     def _fetch(p_num):
@@ -100,7 +100,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                         })
                         return p_num, (res.get('data', {}).get('list', []) if res else [])
 
-                    with ThreadPoolExecutor(max_workers=5) as executor:
+                    with ThreadPoolExecutor(max_workers=10) as executor:
                         page_results = list(executor.map(_fetch, range(1, pages_to_fetch + 1)))
 
                     page_results.sort(key=lambda x: x[0])
@@ -184,7 +184,7 @@ def run_server():
         print(f">> PC Local URL:       {url}")
         print(f">> Android Mobile URL: {mobile_url}")
         print("   (Open this Mobile URL in Chrome on your Android phone!)")
-        print(">> Real-Time 51Game API Bridge: ACTIVE (30s, 1Min, 3Min, 5Min)")
+        print(">> Analysis Engine: 1000 Historical Periods / 300-Round Audit")
         print(">> Android PWA Install: Ready (manifest.json + sw.js)")
         print("Press Ctrl+C to stop the server.")
         print("=" * 65)

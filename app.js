@@ -151,8 +151,8 @@ class SoundEngine {
 // ==========================================
 class PredictionEngine {
   constructor() {
-    this.lookbackWindow = 500;
-    this.trendBias = 50;
+    this.lookbackWindow = 1000;
+    this.trendBias = 50; // 0 (100% Reversion) to 100 (100% Trend)
   }
 
   analyze(history) {
@@ -160,130 +160,145 @@ class PredictionEngine {
       return {
         primaryPick: 'BIG',
         confidence: 65,
+        confirmationRate: 75.0,
+        rawConfirmationRate: 75.0,
+        weightedSignalRate: 75.0,
+        confirmedCount: 5,
+        totalModels: 6,
         colorPick: 'GREEN',
         colorConfidence: 60,
         recNumbers: [7, 8, 3],
         markovScore: 50,
         streakScore: 50,
         patternScore: 50,
-        freqScore: 50
+        rsiScore: 50,
+        cycleScore: 50,
+        bayesScore: 50,
+        modelConfirmations: {}
       };
     }
 
     const windowData = history.slice(0, this.lookbackWindow);
     const lastResult = windowData[0];
 
-    // Model 1: Markov State Transition
-    const markovResult = this.calcMarkov(windowData, lastResult);
+    // ==========================================
+    // CLUSTER A: TREND & MOMENTUM MODELS (3 Models)
+    // ==========================================
+    // Model 1: 2nd-Order Markov State Transition (Tri-Gram)
+    const markovResult = this.calc2ndOrderMarkov(windowData, lastResult);
 
-    // Model 2: Streak / Dragon Momentum
-    const streakResult = this.calcStreak(windowData, lastResult);
+    // Model 2: Dragon Momentum & Streak Exhaustion Engine
+    const streakResult = this.calcDragonStreak(windowData, lastResult);
 
-    // Model 3: Pattern Matcher
-    const patternResult = this.calcPattern(windowData);
+    // Model 3: Multi-Depth Dynamic Pattern Matcher (2, 3, 4-Grams)
+    const patternResult = this.calcMultiDepthPattern(windowData);
 
-    // Model 4: Frequency & Mean Reversion (Cold/Hot)
+    // ==========================================
+    // CLUSTER B: CYCLE & MEAN REVERSION MODELS (3 Models)
+    // ==========================================
+    // Model 4: RSI Volatility & Relative Strength Oscillator
+    const rsiResult = this.calcRsiVolatility(windowData);
+
+    // Model 5: Harmonic Cycle & Recurrence Oscillation (Lag 1 & 2 Autocorrelation)
+    const cycleResult = this.calcHarmonicCycle(windowData);
+
+    // Model 6: Adaptive Bayesian Regime & Long-Term Equilibrium Reversion
+    const bayesResult = this.calcBayesianReversion(windowData);
+
+    // Continuous Frequency counts for color and number selection
     const freqResult = this.calcFrequency(windowData);
 
-    // 50% Trend & Momentum Dynamics (Markov 25% + Streak 25% = 50%)
-    // 50% Pattern & Reversion Dynamics (Pattern 25% + Frequency 25% = 50%)
-    const trendRatio = this.trendBias / 100;
-    const reversalRatio = 1 - trendRatio;
+    // ==========================================
+    // WEIGHTED CONSENSUS ENSEMBLE
+    // ==========================================
+    // User Bias: 50/50 balanced default, shiftable from 0% to 100%
+    const trendFactor = (this.trendBias / 50); // 1.0 at 50, 2.0 at 100, 0.0 at 0
+    const reversalFactor = ((100 - this.trendBias) / 50); // 1.0 at 50, 0.0 at 100, 2.0 at 0
 
-    const W_MARKOV = 0.25;  // 25% (part of 50% Trend System)
-    const W_STREAK = 0.25;  // 25% (part of 50% Trend System)
-    const W_PATTERN = 0.25; // 25% (part of 50% Pattern/Reversion System)
-    const W_FREQ = 0.25;    // 25% (part of 50% Pattern/Reversion System, improved from 15%)
+    // Normalized weights across 6 models (Base ~16.67% each)
+    const W_MARKOV  = 0.175 * trendFactor;
+    const W_STREAK  = 0.165 * trendFactor;
+    const W_PATTERN = 0.160 * trendFactor;
+
+    const W_RSI     = 0.175 * reversalFactor;
+    const W_CYCLE   = 0.165 * reversalFactor;
+    const W_BAYES   = 0.160 * reversalFactor;
+
+    const totalWeight = W_MARKOV + W_STREAK + W_PATTERN + W_RSI + W_CYCLE + W_BAYES || 1;
 
     let bigScore = 0;
     let smallScore = 0;
 
-    // 1. Markov Transition (25% Weight)
+    // 1. Markov 2nd-Gen
     if (markovResult.predicted === 'BIG') {
-      bigScore += markovResult.prob * W_MARKOV;
-      smallScore += (100 - markovResult.prob) * W_MARKOV;
+      bigScore += markovResult.prob * (W_MARKOV / totalWeight);
+      smallScore += (100 - markovResult.prob) * (W_MARKOV / totalWeight);
     } else {
-      smallScore += markovResult.prob * W_MARKOV;
-      bigScore += (100 - markovResult.prob) * W_MARKOV;
+      smallScore += markovResult.prob * (W_MARKOV / totalWeight);
+      bigScore += (100 - markovResult.prob) * (W_MARKOV / totalWeight);
     }
 
-    // 2. Streak / Dragon Momentum (25% Weight)
-    const streakScore = streakResult.score;
-    if (streakResult.currentStreakType === 'BIG') {
-      bigScore += (streakScore * trendRatio + (100 - streakScore) * reversalRatio) * W_STREAK;
-      smallScore += ((100 - streakScore) * trendRatio + streakScore * reversalRatio) * W_STREAK;
+    // 2. Dragon Momentum & Streak
+    if (streakResult.predicted === 'BIG') {
+      bigScore += streakResult.prob * (W_STREAK / totalWeight);
+      smallScore += (100 - streakResult.prob) * (W_STREAK / totalWeight);
     } else {
-      smallScore += (streakScore * trendRatio + (100 - streakScore) * reversalRatio) * W_STREAK;
-      bigScore += ((100 - streakScore) * trendRatio + streakScore * reversalRatio) * W_STREAK;
+      smallScore += streakResult.prob * (W_STREAK / totalWeight);
+      bigScore += (100 - streakResult.prob) * (W_STREAK / totalWeight);
     }
 
-    // 3. Pattern Matcher (25% Weight)
+    // 3. Multi-Depth Pattern Matcher
     if (patternResult.predicted === 'BIG') {
-      bigScore += patternResult.prob * W_PATTERN;
-      smallScore += (100 - patternResult.prob) * W_PATTERN;
+      bigScore += patternResult.prob * (W_PATTERN / totalWeight);
+      smallScore += (100 - patternResult.prob) * (W_PATTERN / totalWeight);
     } else {
-      smallScore += patternResult.prob * W_PATTERN;
-      bigScore += (100 - patternResult.prob) * W_PATTERN;
+      smallScore += patternResult.prob * (W_PATTERN / totalWeight);
+      bigScore += (100 - patternResult.prob) * (W_PATTERN / totalWeight);
     }
 
-    // 4. Frequency & Mean Reversion (25% Weight - Improved continuous model over 500 periods)
-    const dev = Math.abs(freqResult.bigRatio - 0.50);
-    const reversionStrength = Math.min(88, 50 + (dev * 120));
-    if (freqResult.bigRatio < 0.50) {
-      bigScore += reversionStrength * W_FREQ;
-      smallScore += (100 - reversionStrength) * W_FREQ;
+    // 4. RSI Volatility Oscillator
+    if (rsiResult.predicted === 'BIG') {
+      bigScore += rsiResult.prob * (W_RSI / totalWeight);
+      smallScore += (100 - rsiResult.prob) * (W_RSI / totalWeight);
     } else {
-      smallScore += reversionStrength * W_FREQ;
-      bigScore += (100 - reversionStrength) * W_FREQ;
+      smallScore += rsiResult.prob * (W_RSI / totalWeight);
+      bigScore += (100 - rsiResult.prob) * (W_RSI / totalWeight);
+    }
+
+    // 5. Harmonic Cycle
+    if (cycleResult.predicted === 'BIG') {
+      bigScore += cycleResult.prob * (W_CYCLE / totalWeight);
+      smallScore += (100 - cycleResult.prob) * (W_CYCLE / totalWeight);
+    } else {
+      smallScore += cycleResult.prob * (W_CYCLE / totalWeight);
+      bigScore += (100 - cycleResult.prob) * (W_CYCLE / totalWeight);
+    }
+
+    // 6. Bayesian Engine
+    if (bayesResult.predicted === 'BIG') {
+      bigScore += bayesResult.prob * (W_BAYES / totalWeight);
+      smallScore += (100 - bayesResult.prob) * (W_BAYES / totalWeight);
+    } else {
+      smallScore += bayesResult.prob * (W_BAYES / totalWeight);
+      bigScore += (100 - bayesResult.prob) * (W_BAYES / totalWeight);
     }
 
     const totalScore = bigScore + smallScore;
     const bigProbability = (bigScore / (totalScore || 1)) * 100;
     const primaryPick = bigProbability >= 50 ? 'BIG' : 'SMALL';
 
-    // Model Agreement Count (Consensus Strength across all 4 models)
-    const markovPick = markovResult.predicted;
-    const streakPick = streakResult.currentStreakType === 'BIG'
-      ? (trendRatio >= 0.5 ? 'BIG' : 'SMALL')
-      : (trendRatio >= 0.5 ? 'SMALL' : 'BIG');
-    const patternPick = patternResult.predicted;
-    const freqPick = freqResult.bigRatio < 0.50 ? 'BIG' : 'SMALL';
-
-    const votes = [markovPick, streakPick, patternPick, freqPick];
-    const agreeingCount = votes.filter(v => v === primaryPick).length;
-
-    // Margin between scores (normalized 0 to 1)
-    const margin = Math.abs(bigScore - smallScore) / (totalScore || 1);
-
-    // Peak signal strength among agreeing models
-    let peakSignal = 50;
-    if (markovPick === primaryPick) peakSignal = Math.max(peakSignal, markovResult.prob);
-    if (streakPick === primaryPick) peakSignal = Math.max(peakSignal, streakResult.score);
-    if (patternPick === primaryPick) peakSignal = Math.max(peakSignal, patternResult.prob);
-    if (freqPick === primaryPick) peakSignal = Math.max(peakSignal, reversionStrength);
-
-    // Dynamic Confidence based on consensus agreement & signal depth
-    let dynamicConf = 60;
-    if (agreeingCount === 4) {
-      dynamicConf = 82 + Math.round(margin * 12) + Math.round((peakSignal - 50) * 0.2);
-    } else if (agreeingCount === 3) {
-      dynamicConf = 71 + Math.round(margin * 10) + Math.round((peakSignal - 50) * 0.15);
-    } else {
-      dynamicConf = 59 + Math.round(margin * 8) + Math.round((peakSignal - 50) * 0.12);
-    }
-    const confidence = Math.max(56, Math.min(94, dynamicConf));
-
-    // Target Prediction Confirmation Rate in Percentage
+    // Model Consensus Confirmation Evaluation
     const modelConfirmations = {
-      markov: { name: 'Markov', pick: markovPick, prob: Math.round(markovResult.prob), confirmed: markovPick === primaryPick },
-      streak: { name: 'Dragon/Streak', pick: streakPick, prob: Math.round(streakResult.score), confirmed: streakPick === primaryPick },
-      pattern: { name: 'Pattern Matcher', pick: patternPick, prob: Math.round(patternResult.prob), confirmed: patternPick === primaryPick },
-      freq: { name: 'Mean Reversion', pick: freqPick, prob: Math.round(reversionStrength), confirmed: freqPick === primaryPick }
+      markov:  { name: 'Markov 2nd-Gen',       pick: markovResult.predicted,  prob: Math.round(markovResult.prob),  confirmed: markovResult.predicted === primaryPick },
+      streak:  { name: 'Dragon & Streak',      pick: streakResult.predicted,  prob: Math.round(streakResult.prob),  confirmed: streakResult.predicted === primaryPick },
+      pattern: { name: 'Multi-Depth Pattern',  pick: patternResult.predicted, prob: Math.round(patternResult.prob), confirmed: patternResult.predicted === primaryPick },
+      rsi:     { name: 'RSI Volatility',       pick: rsiResult.predicted,     prob: Math.round(rsiResult.prob),     confirmed: rsiResult.predicted === primaryPick },
+      cycle:   { name: 'Harmonic Wave',        pick: cycleResult.predicted,   prob: Math.round(cycleResult.prob),   confirmed: cycleResult.predicted === primaryPick },
+      bayes:   { name: 'Bayesian Engine',      pick: bayesResult.predicted,   prob: Math.round(bayesResult.prob),   confirmed: bayesResult.predicted === primaryPick }
     };
 
+    const totalModels = 6;
     const confirmedCount = Object.values(modelConfirmations).filter(m => m.confirmed).length;
-    const totalModels = 4;
-    // Consensus confirmation percentage: 4/4 = 100.0%, 3/4 = 75.0%, 2/4 = 50.0%
     const rawConfirmationRate = Number(((confirmedCount / totalModels) * 100).toFixed(1));
 
     // Weighted confirmation percentage from signal depth
@@ -295,6 +310,28 @@ class PredictionEngine {
     });
     const weightedSignalRate = Number(((confirmedScoreSum / (totalScoreSum || 1)) * 100).toFixed(1));
     const confirmationRate = Number(((rawConfirmationRate * 0.60) + (weightedSignalRate * 0.40)).toFixed(1));
+
+    // Margin between scores (normalized 0 to 1)
+    const margin = Math.abs(bigScore - smallScore) / (totalScore || 1);
+
+    // Peak signal strength among agreeing models
+    let peakSignal = 50;
+    Object.values(modelConfirmations).forEach(m => {
+      if (m.confirmed) peakSignal = Math.max(peakSignal, m.prob);
+    });
+
+    // Dynamic Confidence based on 6-model consensus
+    let dynamicConf = 60;
+    if (confirmedCount === 6) {
+      dynamicConf = 86 + Math.round(margin * 10) + Math.round((peakSignal - 50) * 0.18);
+    } else if (confirmedCount === 5) {
+      dynamicConf = 78 + Math.round(margin * 9) + Math.round((peakSignal - 50) * 0.15);
+    } else if (confirmedCount === 4) {
+      dynamicConf = 69 + Math.round(margin * 8) + Math.round((peakSignal - 50) * 0.12);
+    } else {
+      dynamicConf = 58 + Math.round(margin * 7) + Math.round((peakSignal - 50) * 0.10);
+    }
+    const confidence = Math.max(56, Math.min(95, dynamicConf));
 
     // Color Pick: Balanced 50% Color Markov + 50% Color Frequency Reversion
     const colorMarkov = this.calcColorMarkov(windowData, lastResult);
@@ -326,13 +363,42 @@ class PredictionEngine {
       colorConfidence: Math.max(55, Math.min(85, colorConfidence)),
       recNumbers,
       markovScore: Math.round(markovResult.prob),
-      streakScore: Math.round(streakResult.score),
+      streakScore: Math.round(streakResult.prob),
       patternScore: Math.round(patternResult.prob),
-      freqScore: Math.round(reversionStrength)
+      rsiScore: Math.round(rsiResult.prob),
+      cycleScore: Math.round(cycleResult.prob),
+      bayesScore: Math.round(bayesResult.prob)
     };
   }
 
-  calcMarkov(windowData, lastResult) {
+  // 1. 2nd-Order Markov State Transition (Tri-Gram State Transitions)
+  calc2ndOrderMarkov(windowData, lastResult) {
+    if (windowData.length < 5) return { predicted: 'BIG', prob: 52 };
+    const prev1 = windowData[1]?.size || lastResult.size;
+    const prev0 = lastResult.size;
+    const targetKey = `${prev1}_${prev0}`;
+
+    let toBig = 0, toSmall = 0;
+    for (let i = 0; i < windowData.length - 2; i++) {
+      const p1 = windowData[i + 2].size;
+      const p0 = windowData[i + 1].size;
+      const next = windowData[i].size;
+      if (`${p1}_${p0}` === targetKey) {
+        if (next === 'BIG') toBig++; else toSmall++;
+      }
+    }
+
+    const total = toBig + toSmall;
+    if (total >= 4) {
+      const probBig = (toBig / total) * 100;
+      const pick = probBig >= 50 ? 'BIG' : 'SMALL';
+      const strength = Math.max(probBig, 100 - probBig);
+      return { predicted: pick, prob: Math.min(88, Math.max(53, strength)) };
+    }
+    return this.calc1stOrderMarkov(windowData, lastResult);
+  }
+
+  calc1stOrderMarkov(windowData, lastResult) {
     let bigToBig = 0, bigToSmall = 0, smallToBig = 0, smallToSmall = 0;
     for (let i = 0; i < windowData.length - 1; i++) {
       const prev = windowData[i + 1].size;
@@ -344,43 +410,143 @@ class PredictionEngine {
       }
     }
     const lastSize = lastResult.size;
-    if (lastSize === 'BIG') {
-      const total = bigToBig + bigToSmall || 1;
-      const probBig = (bigToBig / total) * 100;
-      return { predicted: probBig >= 50 ? 'BIG' : 'SMALL', prob: Math.max(probBig, 100 - probBig) };
-    } else {
-      const total = smallToBig + smallToSmall || 1;
-      const probBig = (smallToBig / total) * 100;
-      return { predicted: probBig >= 50 ? 'BIG' : 'SMALL', prob: Math.max(probBig, 100 - probBig) };
-    }
+    const total = (lastSize === 'BIG' ? bigToBig + bigToSmall : smallToBig + smallToSmall) || 1;
+    const probBig = ((lastSize === 'BIG' ? bigToBig : smallToBig) / total) * 100;
+    return { predicted: probBig >= 50 ? 'BIG' : 'SMALL', prob: Math.max(52, Math.min(85, Math.max(probBig, 100 - probBig))) };
   }
 
-  calcStreak(windowData, lastResult) {
+  // 2. Dragon Momentum & Streak Exhaustion Engine
+  calcDragonStreak(windowData, lastResult) {
     let streakCount = 1;
     const currentStreakType = lastResult.size;
     for (let i = 1; i < windowData.length; i++) {
       if (windowData[i].size === currentStreakType) streakCount++;
       else break;
     }
-    const score = Math.min(90, 50 + (streakCount * 8));
-    return { currentStreakType, streakCount, score };
+    const opposite = currentStreakType === 'BIG' ? 'SMALL' : 'BIG';
+    // Streak <= 3: Momentum continuation (Ride the Dragon)
+    // Streak >= 4: Reversion Exhaustion (Break the Dragon)
+    if (streakCount <= 3) {
+      const prob = Math.min(85, 54 + (streakCount * 7));
+      return { predicted: currentStreakType, streakCount, prob, isExhaustion: false };
+    } else {
+      const prob = Math.min(88, 56 + Math.min(30, (streakCount - 3) * 8));
+      return { predicted: opposite, streakCount, prob, isExhaustion: true };
+    }
   }
 
-  calcPattern(windowData) {
-    if (windowData.length < 5) return { predicted: 'BIG', prob: 50 };
-    const targetSeq = [windowData[1].size, windowData[0].size].join('-');
-    let matchBig = 0, matchSmall = 0;
-    for (let i = 2; i < windowData.length - 1; i++) {
-      const seq = [windowData[i + 1].size, windowData[i].size].join('-');
-      if (seq === targetSeq) {
-        if (windowData[i - 1].size === 'BIG') matchBig++;
-        else matchSmall++;
+  // 3. Multi-Depth Dynamic Pattern Matcher (2, 3, 4-Grams)
+  calcMultiDepthPattern(windowData) {
+    if (windowData.length < 6) return { predicted: 'BIG', prob: 52 };
+    let scoreBig = 0, scoreSmall = 0;
+    const depths = [
+      { len: 4, weight: 3.5 },
+      { len: 3, weight: 2.2 },
+      { len: 2, weight: 1.0 }
+    ];
+
+    for (const { len, weight } of depths) {
+      if (windowData.length <= len + 1) continue;
+      const targetSeq = windowData.slice(0, len).map(d => d.size).join('-');
+      let mBig = 0, mSmall = 0;
+      for (let i = 1; i < windowData.length - len; i++) {
+        const seq = windowData.slice(i, i + len).map(d => d.size).join('-');
+        if (seq === targetSeq) {
+          if (windowData[i - 1].size === 'BIG') mBig++;
+          else mSmall++;
+        }
+      }
+      const sum = mBig + mSmall;
+      if (sum > 0) {
+        scoreBig += (mBig / sum) * weight;
+        scoreSmall += (mSmall / sum) * weight;
       }
     }
-    const total = matchBig + matchSmall;
-    if (total === 0) return { predicted: windowData[0].size === 'BIG' ? 'SMALL' : 'BIG', prob: 60 };
-    const probBig = (matchBig / total) * 100;
-    return { predicted: probBig >= 50 ? 'BIG' : 'SMALL', prob: Math.max(probBig, 100 - probBig) };
+
+    const total = scoreBig + scoreSmall;
+    if (total === 0) {
+      return { predicted: windowData[0].size === 'BIG' ? 'SMALL' : 'BIG', prob: 54 };
+    }
+    const probBig = (scoreBig / total) * 100;
+    const pick = probBig >= 50 ? 'BIG' : 'SMALL';
+    return { predicted: pick, prob: Math.min(89, Math.max(54, Math.max(probBig, 100 - probBig))) };
+  }
+
+  // 4. RSI Volatility & Relative Strength Oscillator (14 & 28 Periods)
+  calcRsiVolatility(windowData) {
+    const period = Math.min(28, windowData.length);
+    if (period < 10) return { predicted: 'BIG', prob: 52 };
+    const sample = windowData.slice(0, period);
+    const bigs = sample.filter(d => d.size === 'BIG').length;
+    const rsi = (bigs / period) * 100;
+
+    // RSI >= 60: Overbought Big -> Reversion to Small
+    // RSI <= 40: Oversold Big (Overbought Small) -> Reversion to Big
+    if (rsi >= 60) {
+      const prob = Math.min(86, 52 + ((rsi - 50) * 1.1));
+      return { predicted: 'SMALL', prob, rsi: Math.round(rsi) };
+    } else if (rsi <= 40) {
+      const prob = Math.min(86, 52 + ((50 - rsi) * 1.1));
+      return { predicted: 'BIG', prob, rsi: Math.round(rsi) };
+    } else {
+      const last = windowData[0].size;
+      return { predicted: last === 'BIG' ? 'SMALL' : 'BIG', prob: 53, rsi: Math.round(rsi) };
+    }
+  }
+
+  // 5. Harmonic Cycle & Recurrence Oscillation (Lag 1 & 2 Autocorrelation)
+  calcHarmonicCycle(windowData) {
+    if (windowData.length < 8) return { predicted: 'BIG', prob: 52 };
+    let alternates = 0;
+    const checkLen = Math.min(20, windowData.length - 1);
+    for (let i = 0; i < checkLen; i++) {
+      if (windowData[i].size !== windowData[i + 1].size) alternates++;
+    }
+    const alternationRate = alternates / checkLen;
+    const last = windowData[0].size;
+    const opposite = last === 'BIG' ? 'SMALL' : 'BIG';
+
+    if (alternationRate >= 0.60) {
+      const prob = Math.min(85, 54 + (alternationRate - 0.5) * 60);
+      return { predicted: opposite, prob, cycleType: 'Ping-Pong Alternation' };
+    }
+
+    let lag2Matches = 0;
+    const lag2Len = Math.min(20, windowData.length - 2);
+    for (let i = 0; i < lag2Len; i++) {
+      if (windowData[i].size === windowData[i + 2].size) lag2Matches++;
+    }
+    const lag2Rate = lag2Matches / lag2Len;
+    if (lag2Rate >= 0.65) {
+      const prev2 = windowData[1].size;
+      return { predicted: prev2, prob: Math.min(84, 54 + (lag2Rate - 0.5) * 55), cycleType: 'Harmonic Lag-2' };
+    }
+
+    return { predicted: last, prob: 53, cycleType: 'Cycle Drift' };
+  }
+
+  // 6. Adaptive Bayesian Regime & Long-Term Equilibrium Reversion
+  calcBayesianReversion(windowData) {
+    const totalRounds = windowData.length;
+    if (totalRounds < 20) return { predicted: 'BIG', prob: 52 };
+
+    const globalBigs = windowData.filter(d => d.size === 'BIG').length;
+    const pGlobalBig = globalBigs / totalRounds;
+
+    const localSlice = windowData.slice(0, Math.min(30, totalRounds));
+    const localBigs = localSlice.filter(d => d.size === 'BIG').length;
+    const pLocalBig = localBigs / localSlice.length;
+
+    const deviation = pLocalBig - 0.50;
+    const pullStrength = Math.min(88, 52 + (Math.abs(deviation) * 110));
+
+    const predicted = deviation > 0 ? 'SMALL' : 'BIG';
+    return {
+      predicted,
+      prob: Math.round(pullStrength),
+      localRatio: Number((pLocalBig * 100).toFixed(1)),
+      globalRatio: Number((pGlobalBig * 100).toFixed(1))
+    };
   }
 
   calcFrequency(windowData) {
@@ -392,7 +558,7 @@ class PredictionEngine {
     });
     return {
       counts,
-      bigRatio: bigCount / windowData.length,
+      bigRatio: bigCount / (windowData.length || 1),
       coldScore: 65
     };
   }
@@ -422,7 +588,7 @@ class PredictionEngine {
 
   getRecommendedNumbers(freqResult, primaryPick, colorPick) {
     const validNumbers = [];
-    const expectedFreq = (freqResult.counts.reduce((a, b) => a + b, 0) || 500) / 10;
+    const expectedFreq = (freqResult.counts.reduce((a, b) => a + b, 0) || 1000) / 10;
     for (let num = 0; num <= 9; num++) {
       const details = getNumberDetails(num);
       let alignScore = 0;
@@ -527,13 +693,13 @@ class WinGoApp {
     this.staking = new StakingSimulator();
     this.sound = new SoundEngine();
     this.activeFilter = 'all';
-    this.historyScope = 100; // Default view: 100 records divided into 10 per page (10 pgs)
+    this.historyScope = 300; // Default view: 300 audited records divided into 10 per page (30 pgs)
 
     // Pagination for History Table (10 records per page)
     this.historyPage = 1;
     this.historyPageSize = 10;
 
-    // Seed default baseline data (500 records) so UI and models are immediately active
+    // Seed default baseline data (1000 records) so UI and models are immediately active
     this.seedBaselineData();
   }
 
@@ -546,7 +712,7 @@ class WinGoApp {
       const datePart = epoch.periodId.slice(0, 8);
 
       const list = [];
-      for (let i = 1; i <= 500; i++) {
+      for (let i = 1; i <= 1000; i++) {
         const num = Math.floor(Math.random() * 10);
         const details = getNumberDetails(num);
         const seq = Math.max(1, currentSeq - i);
@@ -566,12 +732,12 @@ class WinGoApp {
       }
       this.gameStates[tid].history = list;
       this.gameStates[tid].currentPeriod = epoch.periodId;
-      const auditSample = list.slice(0, 100);
+      const auditSample = list.slice(0, 300);
       const winCount = auditSample.filter(x => x.isWin).length;
       this.gameStates[tid].stats = {
-        total: 100,
+        total: 300,
         wins: winCount,
-        losses: 100 - winCount,
+        losses: 300 - winCount,
         streak: 3,
         maxStreak: 7
       };
@@ -946,7 +1112,7 @@ class WinGoApp {
 
     try {
       const typeId = this.activeTypeId;
-      const res = await fetch(`${this.apiBaseUrl}/api/wingo/history?typeId=${typeId}&pageSize=500&pageNo=1`, { cache: 'no-store' });
+      const res = await fetch(`${this.apiBaseUrl}/api/wingo/history?typeId=${typeId}&pageSize=1000&pageNo=1`, { cache: 'no-store' });
       if (!res.ok) return;
 
       const json = await res.json();
@@ -1017,12 +1183,12 @@ class WinGoApp {
     const list = currentState.history;
     if (!list || list.length < 20) return;
 
-    // Win Rate Audit: 100 historical rounds sample
-    const auditCount = Math.min(100, list.length - 10);
+    // Win Rate Audit: 300 historical rounds sample
+    const auditCount = Math.min(300, list.length - 10);
     for (let i = auditCount - 1; i >= 0; i--) {
       const item = list[i];
       if (!item.predicted) {
-        const priorHistory = list.slice(i + 1, i + 1 + 100);
+        const priorHistory = list.slice(i + 1, i + 1 + this.predictor.lookbackWindow);
         const pred = this.predictor.analyze(priorHistory);
         item.predicted = pred.primaryPick;
         item.isWin = (item.size === item.predicted);
@@ -1235,8 +1401,12 @@ class WinGoApp {
         confBadge.textContent = '100% MAXIMUM';
         confBadge.style.background = 'rgba(0, 230, 118, 0.2)';
         confBadge.style.color = 'var(--color-green)';
-      } else if (confRate >= 75) {
-        confBadge.textContent = '75% STRONG';
+      } else if (confRate >= 80) {
+        confBadge.textContent = '83% ULTRA STRONG';
+        confBadge.style.background = 'rgba(0, 230, 118, 0.2)';
+        confBadge.style.color = 'var(--color-green)';
+      } else if (confRate >= 65) {
+        confBadge.textContent = '67% STRONG';
         confBadge.style.background = 'rgba(0, 229, 255, 0.2)';
         confBadge.style.color = 'var(--color-cyan)';
       } else {
@@ -1249,7 +1419,7 @@ class WinGoApp {
     const confDetail = document.getElementById('target-confirmation-detail');
     if (confDetail && pred.modelConfirmations) {
       const agreeingNames = Object.values(pred.modelConfirmations).filter(m => m.confirmed).map(m => m.name);
-      confDetail.textContent = `${pred.confirmedCount || 3} of ${pred.totalModels || 4} Models Confirm ${pred.primaryPick} (${agreeingNames.join(', ')})`;
+      confDetail.textContent = `${pred.confirmedCount || 5} of ${pred.totalModels || 6} Models Confirm ${pred.primaryPick} (${agreeingNames.join(', ')})`;
     }
 
     const confWeighted = document.getElementById('target-confirmation-weighted');
@@ -1257,7 +1427,7 @@ class WinGoApp {
       confWeighted.textContent = `Signal: ${pred.weightedSignalRate || 80}%`;
     }
 
-    // Update confirmation status pills in breakdown rows
+    // Update confirmation status pills in breakdown rows for all 6 models
     if (pred.modelConfirmations) {
       const updatePill = (id, isConfirmed) => {
         const el = document.getElementById(id);
@@ -1270,7 +1440,9 @@ class WinGoApp {
       updatePill('confirm-markov', pred.modelConfirmations.markov?.confirmed);
       updatePill('confirm-streak', pred.modelConfirmations.streak?.confirmed);
       updatePill('confirm-pattern', pred.modelConfirmations.pattern?.confirmed);
-      updatePill('confirm-freq', pred.modelConfirmations.freq?.confirmed);
+      updatePill('confirm-rsi', pred.modelConfirmations.rsi?.confirmed);
+      updatePill('confirm-cycle', pred.modelConfirmations.cycle?.confirmed);
+      updatePill('confirm-bayes', pred.modelConfirmations.bayes?.confirmed);
     }
 
     const colorBadge = document.getElementById('pred-color-badge');
@@ -1286,17 +1458,18 @@ class WinGoApp {
       numbersContainer.appendChild(el);
     });
 
-    document.getElementById('val-markov').textContent = `${pred.markovScore}%`;
-    document.getElementById('bar-markov').style.width = `${pred.markovScore}%`;
-
-    document.getElementById('val-streak').textContent = `${pred.streakScore}%`;
-    document.getElementById('bar-streak').style.width = `${pred.streakScore}%`;
-
-    document.getElementById('val-pattern').textContent = `${pred.patternScore}%`;
-    document.getElementById('bar-pattern').style.width = `${pred.patternScore}%`;
-
-    document.getElementById('val-freq').textContent = `${pred.freqScore}%`;
-    document.getElementById('bar-freq').style.width = `${pred.freqScore}%`;
+    const setModelUI = (idVal, idBar, score) => {
+      const valEl = document.getElementById(idVal);
+      const barEl = document.getElementById(idBar);
+      if (valEl) valEl.textContent = `${score}%`;
+      if (barEl) barEl.style.width = `${score}%`;
+    };
+    setModelUI('val-markov', 'bar-markov', pred.markovScore);
+    setModelUI('val-streak', 'bar-streak', pred.streakScore);
+    setModelUI('val-pattern', 'bar-pattern', pred.patternScore);
+    setModelUI('val-rsi', 'bar-rsi', pred.rsiScore);
+    setModelUI('val-cycle', 'bar-cycle', pred.cycleScore);
+    setModelUI('val-bayes', 'bar-bayes', pred.bayesScore);
   }
 
   renderKPIs() {

@@ -214,15 +214,16 @@
           </div>
         </div>
 
-        <!-- Multi-Model Consensus Breakdown (50% Trend System + 50% Pattern/Reversion System) -->
+        <!-- Multi-Model Consensus Breakdown (50% Trend System + 50% Cycle/Reversion System) -->
         <div style="font-size: 11px; color: var(--text-dim); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-          <span>Consensus Weights:</span>
+          <span>6-Model Consensus:</span>
           <span style="color: var(--color-cyan); font-family: var(--font-mono); font-size: 10px;">50% TREND / 50% REVERSION</span>
         </div>
         <div class="models-breakdown">
+          <!-- Trend & Momentum Cluster (50% base) -->
           <div class="model-row">
             <span class="model-name">
-              Markov (Trend 25%):
+              Markov 2nd-Gen (Trend):
               <span id="confirm-markov" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -230,9 +231,10 @@
             </div>
             <span class="model-val" id="val-markov">72%</span>
           </div>
+
           <div class="model-row">
             <span class="model-name">
-              Dragon / Streak (Trend 25%):
+              Dragon & Streak (Trend):
               <span id="confirm-streak" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -240,9 +242,10 @@
             </div>
             <span class="model-val" id="val-streak">65%</span>
           </div>
+
           <div class="model-row">
             <span class="model-name">
-              Pattern Matcher (Cycle 25%):
+              Multi-Depth Pattern (Trend):
               <span id="confirm-pattern" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -250,15 +253,39 @@
             </div>
             <span class="model-val" id="val-pattern">80%</span>
           </div>
+
+          <!-- Cycle & Mean Reversion Cluster (50% base) -->
           <div class="model-row">
             <span class="model-name">
-              Mean Reversion (Cycle 25%):
-              <span id="confirm-freq" class="confirm-pill divergent">✗</span>
+              RSI Volatility (Cycle):
+              <span id="confirm-rsi" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
-              <div class="model-bar-fill" id="bar-freq" style="width: 58%;"></div>
+              <div class="model-bar-fill" id="bar-rsi" style="width: 68%;"></div>
             </div>
-            <span class="model-val" id="val-freq">58%</span>
+            <span class="model-val" id="val-rsi">68%</span>
+          </div>
+
+          <div class="model-row">
+            <span class="model-name">
+              Harmonic Wave (Cycle):
+              <span id="confirm-cycle" class="confirm-pill confirmed">✓</span>
+            </span>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="bar-cycle" style="width: 62%;"></div>
+            </div>
+            <span class="model-val" id="val-cycle">62%</span>
+          </div>
+
+          <div class="model-row">
+            <span class="model-name">
+              Bayesian Engine (Cycle):
+              <span id="confirm-bayes" class="confirm-pill divergent">✗</span>
+            </span>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="bar-bayes" style="width: 58%;"></div>
+            </div>
+            <span class="model-val" id="val-bayes">58%</span>
           </div>
         </div>
 
@@ -278,7 +305,7 @@
         <div class="glass-panel kpi-card">
           <div class="kpi-label">Win Rate</div>
           <div class="kpi-value" id="kpi-winrate" style="color: var(--color-green);">0.0%</div>
-          <div class="kpi-sub" id="kpi-win-counts">0 Won / 100 Audited</div>
+          <div class="kpi-sub" id="kpi-win-counts">0 Won / 300 Audited</div>
         </div>
         <div class="glass-panel kpi-card">
           <div class="kpi-label">Simulated P/L</div>
@@ -408,9 +435,9 @@
         <div style="margin-bottom: 12px;">
           <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
             <span style="color: var(--text-dim);">Lookback Window:</span>
-            <strong id="lookback-val-text" style="color: var(--color-cyan);">500 Rounds</strong>
+            <strong id="lookback-val-text" style="color: var(--color-cyan);">1000 Rounds</strong>
           </div>
-          <input type="range" id="lookback-slider" min="50" max="500" step="25" value="500" style="width: 100%; accent-color: var(--color-cyan);">
+          <input type="range" id="lookback-slider" min="100" max="1000" step="50" value="1000" style="width: 100%; accent-color: var(--color-cyan);">
         </div>
 
         <div>
@@ -436,9 +463,9 @@
 
       <div class="filter-group">
         <div class="scope-toggle" id="scope-toggle-bar">
-          <button class="scope-btn" data-scope="50" id="scope-50-btn">50 Recs</button>
-          <button class="scope-btn active" data-scope="100" id="scope-100-btn">100 Audit</button>
-          <button class="scope-btn" data-scope="500" id="scope-500-btn">500 All</button>
+          <button class="scope-btn" data-scope="100" id="scope-100-btn">100 Recs</button>
+          <button class="scope-btn active" data-scope="300" id="scope-300-btn">300 Audit</button>
+          <button class="scope-btn" data-scope="1000" id="scope-1000-btn">1000 All</button>
         </div>
         <div class="filter-chips-row" id="filter-chips-row">
           <button class="filter-btn active" data-filter="all">🎯 All</button>
