@@ -1415,29 +1415,28 @@ class WinGoApp {
 
     const confBadge = document.getElementById('target-confirmation-badge');
     if (confBadge) {
-      if (confRate >= 100) {
-        confBadge.textContent = '100% MAXIMUM';
-        confBadge.style.background = 'rgba(0, 230, 118, 0.2)';
-        confBadge.style.color = 'var(--color-green)';
-      } else if (confRate >= 80) {
-        confBadge.textContent = '83% ULTRA STRONG';
+      if (confRate >= 80) {
+        confBadge.textContent = 'ULTRA STRONG';
         confBadge.style.background = 'rgba(0, 230, 118, 0.2)';
         confBadge.style.color = 'var(--color-green)';
       } else if (confRate >= 65) {
-        confBadge.textContent = '67% STRONG';
+        confBadge.textContent = 'STRONG';
         confBadge.style.background = 'rgba(0, 229, 255, 0.2)';
         confBadge.style.color = 'var(--color-cyan)';
-      } else {
-        confBadge.textContent = '50% BALANCED';
+      } else if (confRate >= 50) {
+        confBadge.textContent = 'BALANCED';
         confBadge.style.background = 'rgba(255, 215, 0, 0.2)';
         confBadge.style.color = 'var(--color-gold)';
+      } else {
+        confBadge.textContent = 'MODERATE';
+        confBadge.style.background = 'rgba(255, 71, 87, 0.2)';
+        confBadge.style.color = 'var(--color-red)';
       }
     }
 
     const confDetail = document.getElementById('target-confirmation-detail');
-    if (confDetail && pred.modelConfirmations) {
-      const agreeingNames = Object.values(pred.modelConfirmations).filter(m => m.confirmed).map(m => m.name);
-      confDetail.textContent = `${pred.confirmedCount || 5} of ${pred.totalModels || 6} Models Confirm ${pred.primaryPick} (${agreeingNames.join(', ')})`;
+    if (confDetail) {
+      confDetail.textContent = `${pred.confirmedCount || 5} of ${pred.totalModels || 6} Models Confirm ${pred.primaryPick || 'TARGET'}`;
     }
 
     const confWeighted = document.getElementById('target-confirmation-weighted');
