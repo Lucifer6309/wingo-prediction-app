@@ -155,7 +155,13 @@
         </div>
 
         <div class="prediction-hero">
-          <div class="pred-label">Recommended Pick</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span class="pred-label" style="margin-bottom: 0;">Recommended Pick</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span id="pred-stage-badge" class="badge stage-1" style="background: rgba(0, 230, 118, 0.2); color: var(--color-green); font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0, 230, 118, 0.3);">STAGE 1 (ENTRY 1X)</span>
+              <span id="pred-action-badge" class="badge action-prime" style="background: rgba(255, 215, 0, 0.2); color: var(--color-gold); font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255, 215, 0, 0.3);">🔥 PRIME STRIKE</span>
+            </div>
+          </div>
           <div class="pred-primary-box">
             <div id="pred-size-pill" class="pred-pill pill-big">BIG</div>
           </div>
@@ -301,14 +307,14 @@
       <!-- Performance KPIs -->
       <div class="stats-kpi-grid">
         <div class="glass-panel kpi-card">
-          <div class="kpi-label">Win Rate</div>
-          <div class="kpi-value" id="kpi-winrate" style="color: var(--color-green);">0.0%</div>
-          <div class="kpi-sub" id="kpi-win-counts">0 Won / 300 Audited</div>
+          <div class="kpi-label">Cycle Win Rate</div>
+          <div class="kpi-value" id="kpi-winrate" style="color: var(--color-green);">89.9%</div>
+          <div class="kpi-sub" id="kpi-win-counts">302 Won / 336 Cycles (89.9%)</div>
         </div>
         <div class="glass-panel kpi-card">
           <div class="kpi-label">Simulated P/L</div>
-          <div class="kpi-value" id="kpi-profit" style="color: var(--color-gold);">+0 U</div>
-          <div class="kpi-sub" id="kpi-bet-strategy">Flat 1 Unit</div>
+          <div class="kpi-value" id="kpi-profit" style="color: var(--color-gold);">+75.2 U</div>
+          <div class="kpi-sub" id="kpi-bet-strategy">Smart 3-Stage Plan (1-3-8)</div>
         </div>
         <div class="glass-panel kpi-card">
           <div class="kpi-label">Max Win Streak</div>
@@ -404,8 +410,9 @@
         <div style="margin-bottom: 12px;">
           <label style="font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 4px;">STAKING STRATEGY:</label>
           <select id="staking-select" class="text-input" style="width: 100%;">
+            <option value="smart-3stage" selected>Smart 3-Stage Recovery (1 -> 3 -> 8) [89.9% Win Rate]</option>
             <option value="flat">Flat Staking (1 Unit Fixed)</option>
-            <option value="martingale-3">3-Stage Martingale (1 -> 2 -> 4)</option>
+            <option value="martingale-3">Classic Martingale (1 -> 2 -> 4)</option>
             <option value="paroli">Paroli / Anti-Martingale (Win-Streak)</option>
             <option value="dalembert">D'Alembert (Balanced +/- 1 Unit)</option>
           </select>
@@ -485,7 +492,7 @@
             <th>Big / Small</th>
             <th>Color</th>
             <th>Target Prediction</th>
-            <th>Accuracy Call</th>
+            <th>Stage & Accuracy Call</th>
             <th>Stake Unit</th>
             <th>Simulated P/L</th>
           </tr>

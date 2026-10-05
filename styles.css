@@ -2348,3 +2348,82 @@ body.mobile-view .android-gesture-bar {
     border-radius: 999px !important;
   }
 }
+
+/* ==========================================
+   SMART 3-STAGE RECOVERY BADGES & ANIMATIONS
+   ========================================== */
+#pred-stage-badge.stage-1 {
+  background: rgba(0, 230, 118, 0.18) !important;
+  color: var(--color-green) !important;
+  border: 1px solid rgba(0, 230, 118, 0.4) !important;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
+}
+
+#pred-stage-badge.stage-2 {
+  background: rgba(255, 215, 0, 0.2) !important;
+  color: var(--color-gold) !important;
+  border: 1px solid rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.3);
+  animation: stage-gold-pulse 1.8s infinite ease-in-out;
+}
+
+#pred-stage-badge.stage-3 {
+  background: rgba(255, 71, 87, 0.25) !important;
+  color: var(--color-red) !important;
+  border: 1px solid rgba(255, 71, 87, 0.7) !important;
+  box-shadow: 0 0 16px rgba(255, 71, 87, 0.4);
+  animation: stage-red-pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes stage-gold-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.5);
+  }
+}
+
+@keyframes stage-red-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(255, 71, 87, 0.3);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 22px rgba(255, 71, 87, 0.7);
+  }
+}
+
+#pred-action-badge.action-prime {
+  background: rgba(255, 215, 0, 0.2) !important;
+  color: var(--color-gold) !important;
+  border: 1px solid rgba(255, 215, 0, 0.4) !important;
+}
+
+#pred-action-badge.action-active {
+  background: rgba(0, 229, 255, 0.2) !important;
+  color: var(--color-cyan) !important;
+  border: 1px solid rgba(0, 229, 255, 0.4) !important;
+}
+
+#pred-action-badge.action-recovery {
+  background: rgba(255, 165, 0, 0.22) !important;
+  color: #ffaa00 !important;
+  border: 1px solid rgba(255, 165, 0, 0.5) !important;
+}
+
+#pred-action-badge.action-max {
+  background: rgba(255, 71, 87, 0.25) !important;
+  color: var(--color-red) !important;
+  border: 1px solid rgba(255, 71, 87, 0.6) !important;
+}
+
+#pred-action-badge.action-pass {
+  background: rgba(150, 150, 150, 0.18) !important;
+  color: var(--text-dim) !important;
+  border: 1px solid rgba(150, 150, 150, 0.3) !important;
+}
+
