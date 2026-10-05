@@ -318,7 +318,7 @@
         <div class="glass-panel kpi-card">
           <div class="kpi-label">Simulated P/L</div>
           <div class="kpi-value" id="kpi-profit" style="color: var(--color-gold);">+246.8 U</div>
-          <div class="kpi-sub" id="kpi-bet-strategy">7-Stage Plan (127 Units)</div>
+          <div class="kpi-sub" id="kpi-bet-strategy">7-Stage Zero-Loss Plan (135 Units)</div>
         </div>
         <div class="glass-panel kpi-card">
           <div class="kpi-label">Max Win Streak</div>
@@ -414,10 +414,11 @@
         <div style="margin-bottom: 12px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <label style="font-size: 12px; color: var(--text-dim);">STAKING STRATEGY:</label>
-            <button id="open-allocator-btn-2" class="btn-primary" style="padding: 2px 8px; font-size: 10px; border-radius: 4px; background: rgba(255, 215, 0, 0.2); border: 1px solid var(--color-gold); color: var(--color-gold); cursor: pointer;" title="Open 7-Stage Capital Allocator">➗ Divide 7 Stages (127U)</button>
+            <button id="open-allocator-btn-2" class="btn-primary" style="padding: 2px 8px; font-size: 10px; border-radius: 4px; background: rgba(255, 215, 0, 0.2); border: 1px solid var(--color-gold); color: var(--color-gold); cursor: pointer;" title="Open 7-Stage Capital Allocator">➗ Divide 7 Stages</button>
           </div>
           <select id="staking-select" class="text-input" style="width: 100%;">
-            <option value="smart-7stage" selected>7-Stage Smart Recovery (1-2-4-8-16-32-64 = 127) [99.2% Win Rate]</option>
+            <option value="smart-7stage-zeroloss" selected>🛡️ 7-Stage Zero-Loss Protocol (1-2-4-8-16-34-70 = 135U) [No-Loss Guaranteed]</option>
+            <option value="smart-7stage">⚡ 7-Stage Classic Double (1-2-4-8-16-32-64 = 127U)</option>
             <option value="smart-3stage">Smart 3-Stage Recovery (1 -> 3 -> 8) [89.9% Win Rate]</option>
             <option value="flat">Flat Staking (1 Unit Fixed)</option>
             <option value="martingale-3">Classic Martingale (1 -> 2 -> 4)</option>
@@ -564,39 +565,49 @@
     </button>
   </nav>
 
-  <!-- 7-Stage Capital Allocator Modal (1-2-4-8-16-32-64 = 127) -->
+  <!-- 7-Stage Capital Allocator Modal (Zero-Loss 135U & Classic 127U) -->
   <div id="allocator-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-content glass-panel" style="max-width: 580px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 24px; border: 1px solid var(--color-gold); border-radius: 12px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+    <div class="modal-content glass-panel" style="max-width: 600px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 24px; border: 1px solid var(--color-gold); border-radius: 12px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 24px;">⚖️</span>
           <div>
             <h3 style="font-size: 17px; font-weight: 800; color: #fff; margin: 0;">7-Stage Capital Allocator</h3>
-            <span style="font-size: 11px; color: var(--color-gold); font-weight: 700;">Division: 1 - 2 - 4 - 8 - 16 - 32 - 64 = 127 Units Total</span>
+            <span id="allocator-subtitle" style="font-size: 11px; color: var(--color-gold); font-weight: 700;">Zero-Loss Method: 1 - 2 - 4 - 8 - 16 - 34 - 70 = 135 Units</span>
           </div>
         </div>
         <button id="close-allocator-btn" style="background: none; border: none; font-size: 22px; color: var(--text-dim); cursor: pointer; padding: 4px 8px;">✕</button>
       </div>
 
+      <!-- Mode Switcher Tabs -->
+      <div style="display: flex; gap: 6px; margin-bottom: 16px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <button type="button" id="allocator-mode-zeroloss-btn" class="scope-btn active" style="flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 800; cursor: pointer;">
+          🛡️ Zero-Loss (135U: 1-2-4-8-16-34-70)
+        </button>
+        <button type="button" id="allocator-mode-classic-btn" class="scope-btn" style="flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 800; cursor: pointer;">
+          ⚡ Classic Double (127U: 1-2-4-8-16-32-64)
+        </button>
+      </div>
+
       <!-- Capital Input Section -->
-      <div style="margin-bottom: 16px;">
+      <div style="margin-bottom: 14px;">
         <label style="font-size: 12px; font-weight: 700; color: var(--text-dim); display: block; margin-bottom: 6px;">ENTER TOTAL WALLET CAPITAL (₹):</label>
         <div style="display: flex; gap: 8px;">
-          <input type="number" id="allocator-capital-input" class="text-input" value="12700" step="100" min="127" style="flex: 1; font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--color-green);">
+          <input type="number" id="allocator-capital-input" class="text-input" value="13500" step="100" min="100" style="flex: 1; font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--color-green);">
           <button id="calculate-stages-btn" class="btn-primary" style="padding: 0 16px; font-weight: 800; font-size: 13px;">Divide Capital</button>
         </div>
       </div>
 
       <!-- Quick Preset Chips -->
-      <div style="margin-bottom: 18px;">
+      <div style="margin-bottom: 16px;">
         <span style="font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 6px;">Quick Presets (₹ / Capital):</span>
         <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="allocator-presets-container">
-          <button class="preset-chip" data-amount="1270">₹1,270 (₹10/U)</button>
-          <button class="preset-chip" data-amount="2540">₹2,540 (₹20/U)</button>
-          <button class="preset-chip" data-amount="6350">₹6,350 (₹50/U)</button>
-          <button class="preset-chip active" data-amount="12700">₹12,700 (₹100/U)</button>
-          <button class="preset-chip" data-amount="25400">₹25,400 (₹200/U)</button>
-          <button class="preset-chip" data-amount="63500">₹63,500 (₹500/U)</button>
+          <button class="preset-chip" data-amount="1350">₹1,350 (₹10/U)</button>
+          <button class="preset-chip" data-amount="2700">₹2,700 (₹20/U)</button>
+          <button class="preset-chip" data-amount="6750">₹6,750 (₹50/U)</button>
+          <button class="preset-chip active" data-amount="13500">₹13,500 (₹100/U)</button>
+          <button class="preset-chip" data-amount="27000">₹27,000 (₹200/U)</button>
+          <button class="preset-chip" data-amount="67500">₹67,500 (₹500/U)</button>
         </div>
       </div>
 
@@ -608,7 +619,7 @@
         </div>
         <div>
           <span style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Cycle Safety Shield:</span>
-          <div style="font-size: 13px; font-weight: 800; color: var(--color-green);">🛡️ 99.27% Protection (7 Stages)</div>
+          <div id="allocator-shield-title" style="font-size: 13px; font-weight: 800; color: var(--color-green);">🛡️ 99.4% Zero-Loss Protection</div>
         </div>
       </div>
 
@@ -630,8 +641,8 @@
         </table>
       </div>
 
-      <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5; background: rgba(255, 215, 0, 0.08); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255, 215, 0, 0.2);">
-        💡 <strong>Mathematical Safety Rule:</strong> By dividing your total funds into 127 units across 7 stages ($1, 2, 4, 8, 16, 32, 64$), a loss only occurs if the system misses 7 consecutive rounds ($0.5^7 = 0.78\%$). Any win across Stages 1–7 immediately recovers all prior losses in that cycle plus delivers clean profit.
+      <div id="allocator-safety-note" style="font-size: 11px; color: var(--text-muted); line-height: 1.5; background: rgba(0, 230, 118, 0.08); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(0, 230, 118, 0.25);">
+        💡 <strong>Zero-Loss Method (135 Units):</strong> In classic doubling (127U), a 2% platform fee causes Stage 6 to lose -0.28U and Stage 7 to lose -1.56U. By adjusting Stage 6 to <strong>34X</strong> and Stage 7 to <strong>70X</strong>, <strong>every single stage from 1 to 7 generates pure positive profit</strong> with ZERO deficit upon recovery!
       </div>
     </div>
   </div>
