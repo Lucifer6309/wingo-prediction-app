@@ -1363,18 +1363,18 @@ class WinGoApp {
       if (remSecs <= 5) {
         statusText.textContent = 'Locked / Calculating';
         statusText.classList.add('locked');
-        progressCircle.className = 'timer-circle-progress danger';
+        progressCircle.setAttribute('class', 'timer-circle-progress danger');
         if (remSecs !== lastSecond && remSecs > 0) {
           this.sound.playTick();
         }
       } else if (remSecs <= 10) {
         statusText.textContent = 'Closing Soon';
         statusText.classList.remove('locked');
-        progressCircle.className = 'timer-circle-progress warning';
+        progressCircle.setAttribute('class', 'timer-circle-progress warning');
       } else {
         statusText.textContent = 'Betting Open';
         statusText.classList.remove('locked');
-        progressCircle.className = 'timer-circle-progress';
+        progressCircle.setAttribute('class', 'timer-circle-progress');
       }
 
       // On boundary zero or final seconds: trigger immediate rapid-poll

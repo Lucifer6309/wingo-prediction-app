@@ -295,6 +295,23 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         # Default static file serving
         return super().do_GET()
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == '/api/client-error':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_body = self.rfile.read(content_length)
+            err_text = post_body.decode('utf-8', errors='ignore')
+            print(f"\n[!] BROWSER ERROR REPORTED: {err_text}\n", flush=True)
+            try:
+                with open(os.path.join(DIRECTORY, "client_errors.log"), "a", encoding="utf-8") as f:
+                    f.write(err_text + "\n")
+            except Exception:
+                pass
+            self.send_json_response(200, {'ok': True})
+            return
+        self.send_response(404)
+        self.end_headers()
+
     def send_json_response(self, status, payload):
         body = json.dumps(payload).encode('utf-8')
         self.send_response(status)
@@ -306,7 +323,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
         self.send_header('Access-Control-Allow-Origin', '*')
         super().end_headers()
 
