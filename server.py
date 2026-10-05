@@ -60,7 +60,7 @@ def fetch_signed_51game_api(endpoint_path, data):
         'Ar-Origin': 'https://51gameg.com'
     })
 
-    with urllib.request.urlopen(req, context=ctx, timeout=8) as resp:
+    with urllib.request.urlopen(req, context=ctx, timeout=4) as resp:
         return json.loads(resp.read().decode('utf-8'))
 
 import threading
@@ -70,14 +70,11 @@ class HistoryManager:
         self.lock = threading.Lock()
         self.cache = {}
         self.issue_cache = {}
+        self.updating_issues = set()
+        self.updating_history = set()
 
-    def get_issue(self, type_id):
+    def _fetch_issue_sync(self, type_id):
         now = time.time()
-        with self.lock:
-            cached = self.issue_cache.get(type_id)
-            if cached and (now - cached['time'] < 1.2):
-                return cached['data']
-        
         try:
             data = fetch_signed_51game_api('/GetGameIssue', {'typeId': type_id})
             if data and data.get('code') == 0:
@@ -89,7 +86,6 @@ class HistoryManager:
                 if type_id in self.issue_cache:
                     return self.issue_cache[type_id]['data']
             print(f"[!] Issue fetch exception: {e}")
-            # Synthesize fallback issue so client never fails
             now_dt = time.gmtime(time.time() + 19800) # IST
             period_suffix = int(time.time()) // (30 if type_id == 30 else 60)
             return {
@@ -101,10 +97,36 @@ class HistoryManager:
                     'endTime': time.strftime("%Y-%m-%d %H:%M:%S", now_dt)
                 }
             }
-        return data
+        return {'code': 0, 'msg': 'Fallback', 'data': {'issueNumber': 'Loading...'}}
 
-    def get_history(self, type_id, page_size=1000, page_no=1):
+    def _refresh_issue_worker(self, type_id):
+        try:
+            self._fetch_issue_sync(type_id)
+        finally:
+            with self.lock:
+                self.updating_issues.discard(type_id)
+
+    def get_issue(self, type_id):
         now = time.time()
+        with self.lock:
+            cached = self.issue_cache.get(type_id)
+        
+        # Fresh RAM response (< 2.5s)
+        if cached and (now - cached['time'] < 2.5):
+            return cached['data']
+
+        # Stale-While-Revalidate: Return cached RAM instantly (< 0.2ms) & refresh in background
+        if cached and (now - cached['time'] < 25.0):
+            with self.lock:
+                if type_id not in self.updating_issues:
+                    self.updating_issues.add(type_id)
+                    threading.Thread(target=self._refresh_issue_worker, args=(type_id,), daemon=True).start()
+            return cached['data']
+
+        # Cold start fallback
+        return self._fetch_issue_sync(type_id)
+
+    def _fetch_history_sync(self, type_id, page_size=1000, page_no=1):
         with self.lock:
             if type_id not in self.cache:
                 self.cache[type_id] = {
@@ -114,11 +136,6 @@ class HistoryManager:
                 }
             entry = self.cache[type_id]
 
-        # Serve from RAM if fetched within 1.5s
-        if now - entry['last_fetch'] < 1.5 and len(entry['list']) > 0:
-            return self._format_response(entry['list'], page_size, page_no)
-
-        # Single polite upstream fetch for page 1 (100 items)
         try:
             fresh_res = fetch_signed_51game_api('/GetNoaverageEmerdList', {
                 'typeId': type_id,
@@ -144,19 +161,53 @@ class HistoryManager:
                                     unique_list.append(it)
                             entry['list'] = sorted(unique_list, key=lambda x: str(x['issueNumber']), reverse=True)[:600]
 
-                    # Trigger polite background backfill to 600 if not done yet
                     if len(entry['list']) < 550 and not entry['is_backfilling'] and page_size > 100:
                         entry['is_backfilling'] = True
                         threading.Thread(target=self._backfill_worker, args=(type_id,), daemon=True).start()
-
         except Exception as e:
             print(f"[!] Upstream history error: {e}. Serving {len(entry['list'])} cached records.")
+            with self.lock:
+                entry['last_fetch'] = time.time()
             if entry['list']:
                 return self._format_response(entry['list'], page_size, page_no)
-            # If nothing in cache yet, re-raise
             raise e
 
         return self._format_response(entry['list'], page_size, page_no)
+
+    def _refresh_history_worker(self, type_id, page_size=1000):
+        try:
+            self._fetch_history_sync(type_id, page_size, 1)
+        finally:
+            with self.lock:
+                self.updating_history.discard(type_id)
+
+    def get_history(self, type_id, page_size=1000, page_no=1):
+        now = time.time()
+        with self.lock:
+            if type_id not in self.cache:
+                self.cache[type_id] = {
+                    'list': [],
+                    'last_fetch': 0,
+                    'is_backfilling': False
+                }
+            entry = self.cache[type_id]
+
+        # If RAM cache exists:
+        if len(entry['list']) > 0:
+            # Fresh within 2.8s: return immediately
+            if now - entry['last_fetch'] < 2.8 or entry.get('is_backfilling', False):
+                return self._format_response(entry['list'], page_size, page_no)
+
+            # Stale-While-Revalidate: Return current RAM data immediately (< 0.2ms) & refresh in background
+            with self.lock:
+                if type_id not in self.updating_history:
+                    self.updating_history.add(type_id)
+                    threading.Thread(target=self._refresh_history_worker, args=(type_id, page_size), daemon=True).start()
+
+            return self._format_response(entry['list'], page_size, page_no)
+
+        # Cold start (first request ever)
+        return self._fetch_history_sync(type_id, page_size, page_no)
 
     def _backfill_worker(self, type_id):
         try:
@@ -262,6 +313,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
 def run_server():
     os.chdir(DIRECTORY)
     ports_to_try = [8088, 8089, 8888, 8000, 3000]
@@ -270,7 +325,7 @@ def run_server():
 
     for port in ports_to_try:
         try:
-            httpd = socketserver.TCPServer(("", port), CustomHandler)
+            httpd = ThreadedTCPServer(("", port), CustomHandler)
             selected_port = port
             break
         except OSError:

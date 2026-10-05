@@ -945,12 +945,12 @@ class WinGoApp {
     this.timerTickInterval = null;
     this.apiSyncInterval = null;
 
-    // Per-game state cache
+    // Per-game state cache with explicit typeId
     this.gameStates = {
-      30: { history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" },
-      1:  { history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" },
-      2:  { history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" },
-      3:  { history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" }
+      30: { typeId: 30, history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" },
+      1:  { typeId: 1,  history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" },
+      2:  { typeId: 2,  history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" },
+      3:  { typeId: 3,  history: [], stats: { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0, cycleWinRate: '99.2' }, currentStage: 1, cycleStats: { cyclesTotal: 263, cyclesWon: 261, winRate: '99.2', netPL: 246.8 }, prediction: null, currentPeriod: "" }
     };
 
     this.predictor = new PredictionEngine();
@@ -963,41 +963,70 @@ class WinGoApp {
     this.historyPage = 1;
     this.historyPageSize = 10;
 
-    // Seed default baseline data (1000 records) so UI and models are immediately active
-    this.seedBaselineData();
+    // In-memory prediction journals cache: { [typeId]: { [period]: predObj } }
+    this.cachedJournals = {};
+
+    // Hydrate state instantly from local storage cache or lightweight fallback (< 5ms)
+    this.hydrateInitialState();
   }
 
-  seedBaselineData() {
-    Object.keys(GAME_MODES).forEach(tid => {
-      tid = parseInt(tid, 10);
+  hydrateInitialState() {
+    Object.keys(GAME_MODES).forEach(tidKey => {
+      const tid = parseInt(tidKey, 10);
       const epoch = getEpochPeriodInfo(tid);
-      const currentSeq = parseInt(epoch.periodId.slice(-4), 10);
       const prefix = GAME_MODES[tid].prefix;
       const datePart = epoch.periodId.slice(0, 8);
+      const currentSeq = parseInt(epoch.periodId.slice(-4), 10);
 
-      const list = [];
-      for (let i = 1; i <= 600; i++) {
-        const num = Math.floor(Math.random() * 10);
-        const details = getNumberDetails(num);
-        const seq = Math.max(1, currentSeq - i);
-        const pid = `${datePart}${prefix}${String(seq).padStart(4, '0')}`;
-        const isWin = Math.random() > 0.45;
-        list.push({
-          period: pid,
-          number: num,
-          size: details.size,
-          color: details.color,
-          colorDisplay: details.colorDisplay,
-          predicted: isWin ? details.size : (details.size === 'BIG' ? 'SMALL' : 'BIG'),
-          isWin: isWin,
-          stake: 1,
-          netPL: isWin ? 0.96 : -1
-        });
+      let history = null;
+      let cachedPeriod = null;
+
+      // 1. Try to restore real draws from localStorage for instant 0ms hydration on refresh
+      try {
+        const rawHistory = localStorage.getItem(`wingo_cached_draws_${tid}`);
+        if (rawHistory) {
+          const parsed = JSON.parse(rawHistory);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            history = parsed;
+          }
+        }
+        cachedPeriod = localStorage.getItem(`wingo_cached_period_${tid}`);
+      } catch (e) {}
+
+      // 2. Fallback to lightweight synthetic placeholder if no cache exists yet
+      if (!history || history.length === 0) {
+        history = [];
+        const count = (tid === this.activeTypeId) ? 60 : 20;
+        for (let i = 1; i <= count; i++) {
+          const num = Math.floor(Math.random() * 10);
+          const details = getNumberDetails(num);
+          const seq = Math.max(1, currentSeq - i);
+          const pid = `${datePart}${prefix}${String(seq).padStart(4, '0')}`;
+          const isWin = Math.random() > 0.45;
+          history.push({
+            period: pid,
+            number: num,
+            size: details.size,
+            color: details.color,
+            colorDisplay: details.colorDisplay,
+            predicted: isWin ? details.size : (details.size === 'BIG' ? 'SMALL' : 'BIG'),
+            isWin: isWin,
+            stake: 1,
+            netPL: isWin ? 0.96 : -1,
+            stage: 1,
+            cycleResult: isWin ? '✓ WON (L1)' : '⚡ STAGE 1 (CONT)'
+          });
+        }
       }
-      this.gameStates[tid].history = list;
-      this.gameStates[tid].currentPeriod = epoch.periodId;
-      this.backtestHistory(this.gameStates[tid]);
-      this.gameStates[tid].prediction = this.predictor.analyze(list, this.gameStates[tid].currentStage || 1);
+
+      this.gameStates[tid].history = history;
+      this.gameStates[tid].currentPeriod = cachedPeriod || epoch.periodId;
+
+      // ONLY backtest the active mode on startup! Inactive modes are backtested on-demand.
+      if (tid === this.activeTypeId) {
+        this.backtestHistory(this.gameStates[tid]);
+        this.gameStates[tid].prediction = this.predictor.analyze(history, this.gameStates[tid].currentStage || 1);
+      }
     });
   }
 
@@ -1061,27 +1090,25 @@ class WinGoApp {
     }
   }
 
-  async init() {
+  init() {
     this.initViewMode();
     this.updateIndianStandardTime();
     this.bindEvents();
     this.setupTabs();
     this.setupAllocatorModal();
 
-    // Render immediately from initial state so screen is NEVER frozen or empty
+    // Render immediately from initial state so screen is NEVER frozen or empty (< 10ms)
     this.render();
 
     // Start Real-Time Synchronized Timer loop immediately
     this.startClockLoop();
 
-    // Discover local backend API server bridge
-    await this.discoverApiBridge();
-
-    // Pull initial live data from 51Game
-    await this.syncLiveDraws();
-
-    // Start background sync loop
-    this.startApiPollingLoop();
+    // Launch API discovery and live sync in background without blocking UI render
+    (async () => {
+      await this.discoverApiBridge();
+      await this.syncLiveDraws();
+      this.startApiPollingLoop();
+    })();
   }
 
   setupTabs() {
@@ -1097,6 +1124,12 @@ class WinGoApp {
         this.historyPage = 1;
         const mode = GAME_MODES[typeId];
         document.getElementById('active-game-title').textContent = `${mode.name} (Live)`;
+
+        const state = this.gameStates[typeId];
+        if (state.history && state.history.length > 0 && (!state.stats || state.stats.total === 0 || !state.prediction)) {
+          this.backtestHistory(state);
+          state.prediction = this.predictor.analyze(state.history, state.currentStage || 1);
+        }
 
         this.render();
         await this.syncLiveDraws();
@@ -1378,47 +1411,105 @@ class WinGoApp {
   // API DISCOVERY & LIVE STREAMING
   // ==========================================
   async discoverApiBridge() {
-    const candidates = [];
-    if (window.location.protocol.startsWith('http')) {
-      candidates.push(window.location.origin);
-    }
-    const hostWithPort = window.location.hostname ? `http://${window.location.hostname}:8088` : null;
-    if (hostWithPort && !candidates.includes(hostWithPort)) candidates.push(hostWithPort);
-    candidates.push('http://localhost:8088', 'http://127.0.0.1:8088', 'http://localhost:8089');
-
-    for (const host of candidates) {
+    // 1. Try cached host from localStorage first (near 0ms)
+    const cachedHost = localStorage.getItem('wingo_api_bridge_host');
+    if (cachedHost) {
       try {
-        const res = await fetch(`${host}/api/wingo/issue?typeId=30`, { cache: 'no-store' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 350);
+        const res = await fetch(`${cachedHost}/api/wingo/issue?typeId=30`, { 
+          cache: 'no-store', 
+          signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
         if (res.ok) {
           const json = await res.json();
           if (json && json.data && json.data.issueNumber) {
-            this.apiBaseUrl = host;
+            this.apiBaseUrl = cachedHost;
             this.isApiConnected = true;
-            document.getElementById('api-status-text').textContent = `51Game Live (${host.replace('http://', '')})`;
-            document.getElementById('sync-status-badge').textContent = 'LIVE API SYNCED';
+            this.updateBridgeStatusUI(cachedHost);
             return true;
           }
         }
       } catch (e) {}
     }
 
+    // 2. Parallel candidate probe with AbortController timeout
+    const candidates = [];
+    if (window.location.protocol.startsWith('http')) {
+      candidates.push(window.location.origin);
+    }
+    const hostWithPort = window.location.hostname ? `http://${window.location.hostname}:8088` : null;
+    if (hostWithPort && !candidates.includes(hostWithPort)) candidates.push(hostWithPort);
+    ['http://localhost:8088', 'http://127.0.0.1:8088', 'http://localhost:8089'].forEach(h => {
+      if (!candidates.includes(h)) candidates.push(h);
+    });
+
+    try {
+      const probeCandidate = async (host) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600);
+        try {
+          const res = await fetch(`${host}/api/wingo/issue?typeId=30`, { 
+            cache: 'no-store', 
+            signal: controller.signal 
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const json = await res.json();
+            if (json && json.data && json.data.issueNumber) {
+              return host;
+            }
+          }
+        } catch (e) {
+          clearTimeout(timeoutId);
+        }
+        throw new Error('Host unreachable');
+      };
+
+      const workingHost = await Promise.any(candidates.map(c => probeCandidate(c)));
+      if (workingHost) {
+        this.apiBaseUrl = workingHost;
+        this.isApiConnected = true;
+        try { localStorage.setItem('wingo_api_bridge_host', workingHost); } catch (e) {}
+        this.updateBridgeStatusUI(workingHost);
+        return true;
+      }
+    } catch (e) {}
+
     // Fallback indicator
-    document.getElementById('api-status-text').textContent = 'Epoch Real-Time Sync';
-    document.getElementById('sync-status-badge').textContent = 'REAL-TIME EPOCH';
+    this.updateBridgeStatusUI(null);
     return false;
   }
 
-  // Persistent Prediction Journal in localStorage
-  getSavedPredictions(typeId) {
-    try {
-      const raw = localStorage.getItem(`wingo_predictions_journal_${typeId}`);
-      return raw ? JSON.parse(raw) : {};
-    } catch (e) {
-      return {};
+  updateBridgeStatusUI(host) {
+    const statusText = document.getElementById('api-status-text');
+    const badge = document.getElementById('sync-status-badge');
+    if (!statusText || !badge) return;
+
+    if (host) {
+      statusText.textContent = `51Game Live (${host.replace('http://', '')})`;
+      badge.textContent = 'LIVE API SYNCED';
+    } else {
+      statusText.textContent = 'Epoch Real-Time Sync';
+      badge.textContent = 'REAL-TIME EPOCH';
     }
   }
 
-  savePrediction(typeId, periodId, predObj) {
+  // Persistent Prediction Journal in localStorage with In-Memory Caching
+  getSavedPredictions(typeId) {
+    if (!this.cachedJournals) this.cachedJournals = {};
+    if (this.cachedJournals[typeId]) return this.cachedJournals[typeId];
+    try {
+      const raw = localStorage.getItem(`wingo_predictions_journal_${typeId}`);
+      this.cachedJournals[typeId] = raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      this.cachedJournals[typeId] = {};
+    }
+    return this.cachedJournals[typeId];
+  }
+
+  savePrediction(typeId, periodId, predObj, deferStorage = false) {
     if (!periodId || periodId === 'Loading...') return;
     try {
       const journal = this.getSavedPredictions(typeId);
@@ -1429,14 +1520,25 @@ class WinGoApp {
         confirmationRate: predObj.confirmationRate,
         colorPick: predObj.colorPick,
         recNumbers: predObj.recNumbers,
+        stage: predObj.stage || 1,
         timestamp: Date.now()
       };
-      // Keep up to 800 recent periods in journal
-      const keys = Object.keys(journal);
-      if (keys.length > 800) {
-        keys.sort().slice(0, keys.length - 800).forEach(k => delete journal[k]);
+      if (!deferStorage) {
+        this.flushSavedPredictions(typeId);
       }
-      localStorage.setItem(`wingo_predictions_journal_${typeId}`, JSON.stringify(journal));
+    } catch (e) {}
+  }
+
+  flushSavedPredictions(typeId) {
+    try {
+      if (this.cachedJournals && this.cachedJournals[typeId]) {
+        const journal = this.cachedJournals[typeId];
+        const keys = Object.keys(journal);
+        if (keys.length > 800) {
+          keys.sort().slice(0, keys.length - 800).forEach(k => delete journal[k]);
+        }
+        localStorage.setItem(`wingo_predictions_journal_${typeId}`, JSON.stringify(journal));
+      }
     } catch (e) {}
   }
 
@@ -1447,7 +1549,7 @@ class WinGoApp {
         journal[periodId].drawnSize = drawnSize;
         journal[periodId].drawnNumber = drawnNumber;
         journal[periodId].isWin = (drawnSize === journal[periodId].predicted);
-        localStorage.setItem(`wingo_predictions_journal_${typeId}`, JSON.stringify(journal));
+        this.flushSavedPredictions(typeId);
       }
     } catch (e) {}
   }
@@ -1460,16 +1562,35 @@ class WinGoApp {
 
     try {
       const typeId = this.activeTypeId;
-      const res = await fetch(`${this.apiBaseUrl}/api/wingo/history?typeId=${typeId}&pageSize=600&pageNo=1`, { cache: 'no-store' });
-      if (!res.ok) return false;
 
-      const json = await res.json();
+      // Parallel fetch for history and active issue
+      const [histRes, issueRes] = await Promise.all([
+        fetch(`${this.apiBaseUrl}/api/wingo/history?typeId=${typeId}&pageSize=600&pageNo=1`, { cache: 'no-store' }),
+        fetch(`${this.apiBaseUrl}/api/wingo/issue?typeId=${typeId}`, { cache: 'no-store' })
+      ]);
+
+      if (!histRes.ok) return false;
+
+      const json = await histRes.json();
       if (!json || !json.data || !Array.isArray(json.data.list)) return false;
 
       const rawList = json.data.list;
       const currentState = this.gameStates[typeId];
       const journal = this.getSavedPredictions(typeId);
       const existingMap = new Map((currentState.history || []).map(h => [h.period, h]));
+
+      // Parse current issue in parallel
+      if (issueRes && issueRes.ok) {
+        try {
+          const issueJson = await issueRes.json();
+          if (issueJson && issueJson.data && issueJson.data.issueNumber && issueJson.data.issueNumber !== 'Loading...') {
+            currentState.currentPeriod = issueJson.data.issueNumber;
+            const periodEl = document.getElementById('current-period-text');
+            if (periodEl) periodEl.textContent = currentState.currentPeriod;
+            try { localStorage.setItem(`wingo_cached_period_${typeId}`, currentState.currentPeriod); } catch (e) {}
+          }
+        } catch (e) {}
+      }
 
       const parsedDraws = rawList.map(item => {
         const num = parseInt(item.number, 10);
@@ -1526,20 +1647,15 @@ class WinGoApp {
 
         currentState.history = parsedDraws;
 
-        // Run full backtest so ALL historical rounds have predictions, win rates and PL
-        this.backtestHistory(currentState);
-
-        // Fetch active period issue
+        // Cache real draws in localStorage for instant hydration on refresh
         try {
-          const issueRes = await fetch(`${this.apiBaseUrl}/api/wingo/issue?typeId=${typeId}`, { cache: 'no-store' });
-          if (issueRes.ok) {
-            const issueJson = await issueRes.json();
-            if (issueJson && issueJson.data && issueJson.data.issueNumber && issueJson.data.issueNumber !== 'Loading...') {
-              currentState.currentPeriod = issueJson.data.issueNumber;
-              document.getElementById('current-period-text').textContent = currentState.currentPeriod;
-            }
-          }
+          localStorage.setItem(`wingo_cached_draws_${typeId}`, JSON.stringify(parsedDraws.slice(0, 600)));
         } catch (e) {}
+
+        // Only run heavy backtest if draws changed or not yet backtested
+        if (isNewDraw || !prevTop || !currentState.stats || currentState.stats.total === 0) {
+          this.backtestHistory(currentState);
+        }
 
         this.updateActivePrediction();
         this.render();
@@ -1554,7 +1670,7 @@ class WinGoApp {
   backtestHistory(currentState) {
     const list = currentState.history;
     if (!list || list.length < 5) return;
-    const typeId = this.activeTypeId;
+    const typeId = currentState.typeId || this.activeTypeId;
     const journal = this.getSavedPredictions(typeId);
 
     // Step-by-step chronological simulation of 7-Stage Zero-Loss Protocol (1-2-4-8-16-34-70 = 135 Units)
@@ -1579,7 +1695,7 @@ class WinGoApp {
       } else {
         const pred = this.predictor.analyze(priorHistory, stage);
         predPick = pred.primaryPick;
-        this.savePrediction(typeId, item.period, pred);
+        this.savePrediction(typeId, item.period, pred, true); // deferStorage = true
       }
 
       const currentStake = STAGE_STAKES[stage - 1] || 1;
@@ -1611,6 +1727,9 @@ class WinGoApp {
       }
       netPL += item.netPL;
     }
+
+    // Flush batch prediction updates to localStorage once at the end of backtesting
+    this.flushSavedPredictions(typeId);
 
     // Set next stage for the upcoming active draw
     currentState.currentStage = stage;
@@ -2462,7 +2581,15 @@ class WinGoApp {
 }
 
 // Start application immediately
-window.addEventListener('DOMContentLoaded', () => {
-  window.winGoApp = new WinGoApp();
-  window.winGoApp.init();
-});
+function startWinGoApp() {
+  if (!window.winGoApp) {
+    window.winGoApp = new WinGoApp();
+    window.winGoApp.init();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startWinGoApp);
+} else {
+  startWinGoApp();
+}
