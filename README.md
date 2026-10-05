@@ -65,5 +65,55 @@ Double-click [**`index.html`**](file:///c:/Users/VENKATA%20PAVAN%20KUMAR/Downloa
 
 ---
 
+## 🌐 Cloud & VPS Deployment
+
+This application includes a complete containerized and cloud-ready setup (`Dockerfile`, `docker-compose.yml`, `Procfile`, `requirements.txt`).
+
+### Option A: 1-Click Cloud Hosting (Render / Railway)
+1. Push your repository to GitHub: `https://github.com/Lucifer6309/wingo-prediction-app`
+2. Go to [Render.com](https://render.com) or [Railway.app](https://railway.app).
+3. Click **"New Web Service"** and select your GitHub repository.
+4. Set Build Command: `(leave blank or pip install -r requirements.txt)`
+5. Set Start Command: `python server.py`
+6. Deploy! Your app will be live on HTTPS with an automatic public URL.
+7. Under Custom Domains, add your domain (e.g., `ramnaycloud.com`) and point your DNS CNAME/A records.
+
+### Option B: Linux VPS / Docker Deployment (Ubuntu / Debian / CentOS)
+Connect to your VPS via SSH and run:
+```bash
+# 1. Clone repository
+git clone https://github.com/Lucifer6309/wingo-prediction-app.git
+cd wingo-prediction-app
+
+# 2. Run with Docker Compose
+docker compose up -d
+
+# OR Run directly with Python (in background)
+nohup python3 server.py > server.log 2>&1 &
+```
+
+### Option C: Nginx Reverse Proxy with SSL (For Custom Domains)
+Point your domain's DNS A-record to your server IP, then configure Nginx:
+```nginx
+server {
+    server_name ramnaycloud.com www.ramnaycloud.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+Install free SSL with Let's Encrypt:
+```bash
+sudo certbot --nginx -d ramnaycloud.com -d www.ramnaycloud.com
+```
+
+---
+
 ## ⚠️ Educational & Probability Disclaimer
 Win Go outcomes are generated on remote servers via PRNG. Each round is an independent random event (Gambler's Fallacy). This tool provides data visualization, pattern recognition, and backtesting for statistical study and simulation.

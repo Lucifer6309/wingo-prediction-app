@@ -338,7 +338,14 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 def run_server():
     os.chdir(DIRECTORY)
-    ports_to_try = [8088, 8089, 8888, 8000, 3000]
+    env_port = os.environ.get("PORT")
+    if env_port:
+        try:
+            ports_to_try = [int(env_port)]
+        except ValueError:
+            ports_to_try = [8088, 8089, 8888, 8000, 3000]
+    else:
+        ports_to_try = [8088, 8089, 8888, 8000, 3000]
     httpd = None
     selected_port = None
 
@@ -376,10 +383,12 @@ def run_server():
         print(">> Android PWA Install: Ready (manifest.json + sw.js)")
         print("Press Ctrl+C to stop the server.")
         print("=" * 65)
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+        # Only launch browser if running locally (not in cloud/headless environment)
+        if not os.environ.get("PORT") and not os.environ.get("RENDER") and not os.environ.get("RAILWAY_ENVIRONMENT"):
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

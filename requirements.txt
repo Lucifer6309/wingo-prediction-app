@@ -1,0 +1,2 @@
+# WinGo Prediction Studio runs on the pure Python standard library.
+# No third-party pip dependencies required.
