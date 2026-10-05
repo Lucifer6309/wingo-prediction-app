@@ -146,9 +146,12 @@
 
       <!-- Active Prediction Engine Card -->
       <section class="glass-panel prediction-card" id="target-prediction-section">
-        <div class="card-title">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
           <span>Target Prediction (Next Draw)</span>
-          <span class="badge" id="pred-status-badge" style="background: rgba(0, 230, 118, 0.2); color: var(--color-green);">LIVE AI</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span id="target-pred-period-badge" style="font-family: var(--font-mono); font-size: 11px; color: var(--color-gold); font-weight: 700; background: rgba(255, 215, 0, 0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255, 215, 0, 0.3);">TARGET: #--</span>
+            <span class="badge" id="pred-status-badge" style="background: rgba(0, 230, 118, 0.2); color: var(--color-green);">LIVE AI</span>
+          </div>
         </div>
 
         <div class="prediction-hero">
@@ -209,16 +212,16 @@
           </div>
         </div>
 
-        <!-- Multi-Model Consensus Breakdown (50% Trend System + 50% Cycle/Reversion System) -->
+        <!-- Multi-Model Consensus Breakdown (Adaptive Walk-Forward Weighted Quant Models) -->
         <div style="font-size: 11px; color: var(--text-dim); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-          <span>6-Model Consensus:</span>
-          <span style="color: var(--color-cyan); font-family: var(--font-mono); font-size: 10px;">50% TREND / 50% REVERSION</span>
+          <span>Adaptive Quant Models:</span>
+          <span style="color: var(--color-cyan); font-family: var(--font-mono); font-size: 10px;">WALK-FORWARD WEIGHTED</span>
         </div>
         <div class="models-breakdown">
-          <!-- Trend & Momentum Cluster (50% base) -->
+          <!-- Trend & Momentum Cluster -->
           <div class="model-row">
             <span class="model-name">
-              Markov 2nd-Gen (Trend):
+              3rd-Order Markov & Digit (Trend):
               <span id="confirm-markov" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -229,7 +232,7 @@
 
           <div class="model-row">
             <span class="model-name">
-              Dragon & Streak (Trend):
+              Weibull Dragon & Hazard (Trend):
               <span id="confirm-streak" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -240,7 +243,7 @@
 
           <div class="model-row">
             <span class="model-name">
-              Multi-Depth Pattern (Trend):
+              Decayed Multi-Gram (Trend):
               <span id="confirm-pattern" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -249,10 +252,10 @@
             <span class="model-val" id="val-pattern">80%</span>
           </div>
 
-          <!-- Cycle & Mean Reversion Cluster (50% base) -->
+          <!-- Cycle & Mean Reversion Cluster -->
           <div class="model-row">
             <span class="model-name">
-              RSI Volatility (Cycle):
+              Dual-Window RSI & Bands (Cycle):
               <span id="confirm-rsi" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -263,7 +266,7 @@
 
           <div class="model-row">
             <span class="model-name">
-              Harmonic Wave (Cycle):
+              Harmonic Multi-Lag Wave (Cycle):
               <span id="confirm-cycle" class="confirm-pill confirmed">✓</span>
             </span>
             <div class="model-bar-wrap">
@@ -274,7 +277,7 @@
 
           <div class="model-row">
             <span class="model-name">
-              Bayesian Engine (Cycle):
+              Conjugate Beta-Binomial (Cycle):
               <span id="confirm-bayes" class="confirm-pill divergent">✗</span>
             </span>
             <div class="model-bar-wrap">
