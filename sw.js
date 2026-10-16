@@ -1,5 +1,5 @@
 // WinGo Intelligence Studio - Service Worker
-const CACHE_NAME = 'wingo-studio-v3';
+const CACHE_NAME = 'wingo-studio-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
