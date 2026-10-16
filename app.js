@@ -252,7 +252,7 @@ class PredictionEngine {
     };
   }
 
-  analyze(history, stage = 1) {
+  analyze(history, stage = 1, is3Stage = false) {
     if (!history || history.length < 3) {
       return {
         primaryPick: 'BIG',
@@ -274,8 +274,8 @@ class PredictionEngine {
         regime: { key: 'EQUILIBRIUM', label: '⚖️ QUANT EQUILIBRIUM', desc: 'Starting up engine...' },
         modelConfirmations: {},
         stage: stage || 1,
-        stakeUnits: stage === 1 ? 1 : (stage === 2 ? 2 : 4),
-        actionCall: '⚡ ACTIVE BET (1X)'
+        stakeUnits: is3Stage ? (stage === 1 ? 1 : (stage === 2 ? 3 : 8)) : (stage === 1 ? 1 : (stage === 2 ? 2 : 4)),
+        actionCall: is3Stage ? (stage === 1 ? '⚡ ACTIVE BET (1X)' : (stage === 2 ? '⚡ RECOVERY SHIELD (3X)' : '🛡️ MAXIMUM SHIELD (8X)')) : '⚡ ACTIVE BET (1X)'
       };
     }
 
@@ -366,28 +366,50 @@ class PredictionEngine {
     const edge = Math.abs(bigProbability - 50);
 
     // ==========================================
-    // 4. STAGES 2 TO 7 ERROR-CORRECTION RECOVERY PROTOCOL
+    // 4. ADAPTIVE ERROR-CORRECTION RECOVERY PROTOCOL
     // ==========================================
-    // In Recovery Mode (1-2-4-8-16-34-70 = 135 Units), adapt to market structure
-    // and eliminate the 2-2 wave whipsaw trap to guarantee 99.8%+ cycle success
+    // In Recovery Mode (3-Stage: 1-3-8 = 12U or 7-Stage: 1-2-4-8-16-34-70 = 135U),
+    // dynamically adapt to Dragon Hiccup rebounds, Harmonic 2-2 Waves, and Streak Persistence
+    // to maximize stage completion and prevent consecutive whipsaw busts
     if (stage >= 2 && stage <= 7) {
       const s0 = windowData[0]?.size;
       const s1 = windowData[1]?.size;
       const s2 = windowData[2]?.size;
       const s3 = windowData[3]?.size;
+      const s4 = windowData[4]?.size;
 
-      if (s0 === s1 && s2 === s3 && s1 !== s2) {
-        // Completed pair X X after Y Y -> flip to break whipsaw!
+      // 1. Dragon Hiccup / Single Cut Breaker:
+      // When s1 === s2 === s3 (a streak of 3+) and s0 is a single cut (s0 !== s1),
+      // the dominant momentum is the dragon! Rebound immediately to s1!
+      if (s1 === s2 && s2 === s3 && s0 !== s1) {
+        primaryPick = s1;
+      }
+      // 2. Harmonic 2-2 Completed Pair Flip (X X after Y Y):
+      // Both pairs are complete. Flip to initiate new wave and break whipsaw!
+      else if (s0 === s1 && s2 === s3 && s1 !== s2 && (windowData.length < 5 || s4 !== s3)) {
         primaryPick = (s0 === 'BIG' ? 'SMALL' : 'BIG');
-      } else if (s1 === s2 && s0 !== s1) {
-        // Formed X X Y -> complete the pair with Y
+      }
+      // 3. Harmonic 2-2 Pair Formation (X X Y -> Complete with Y):
+      // Previous was a pair (s1 === s2), but not a dragon (s3 !== s2). Complete pair with s0!
+      else if (s1 === s2 && s0 !== s1 && (windowData.length < 4 || s3 !== s2)) {
         primaryPick = s0;
-      } else if (s0 === s1) {
-        // Active streak continuation
+      }
+      // 4. Streak Continuation (Never fade a 2+ streak in recovery):
+      else if (s0 === s1) {
         primaryPick = s0;
-      } else {
-        // Active alternation continuation
+      }
+      // 5. Alternation Wave Continuation:
+      else {
         primaryPick = (s0 === 'BIG' ? 'SMALL' : 'BIG');
+      }
+
+      // Stage 3 Ultimate Shield for 3-Stage Precision Mode:
+      if (is3Stage && stage === 3) {
+        if (s0 === s1) {
+          primaryPick = s0; // Absolute rule: NEVER fade an active streak on Stage 3!
+        } else {
+          primaryPick = (s0 === 'BIG' ? 'SMALL' : 'BIG');
+        }
       }
     }
 
@@ -427,8 +449,9 @@ class PredictionEngine {
     }
     let confidence = Math.max(58, Math.min(97, dynamicConf));
 
-    const STAGE_STAKES = [1, 2, 4, 8, 16, 34, 70];
-    const stakeUnits = STAGE_STAKES[stage - 1] || 1;
+    const STAGE_STAKES_7 = [1, 2, 4, 8, 16, 34, 70];
+    const STAGE_STAKES_3 = [1, 3, 8];
+    const stakeUnits = is3Stage ? (STAGE_STAKES_3[stage - 1] || 1) : (STAGE_STAKES_7[stage - 1] || 1);
 
     // ==========================================
     // 5. SIGNAL QUALITY & SELECTIVE STRIKE CLASSIFIER
@@ -443,24 +466,34 @@ class PredictionEngine {
       } else {
         actionCall = '⏸️ PRUDENT PASS (CHOP)';
       }
-    } else if (stage === 2) {
-      actionCall = '⚡ RECOVERY (2X)';
-      confidence = Math.max(confidence, 84);
-    } else if (stage === 3) {
-      actionCall = '⚡ RECOVERY (4X)';
-      confidence = Math.max(confidence, 88);
-    } else if (stage === 4) {
-      actionCall = '🎯 STRIKE (8X)';
-      confidence = Math.max(confidence, 92);
-    } else if (stage === 5) {
-      actionCall = '🔥 HIGH STRIKE (16X)';
-      confidence = Math.max(confidence, 95);
-    } else if (stage === 6) {
-      actionCall = '🛡️ ZERO-LOSS STRIKE (34X)';
-      confidence = Math.max(confidence, 97);
-    } else if (stage === 7) {
-      actionCall = '🛡️ ZERO-LOSS SHIELD (70X)';
-      confidence = Math.max(confidence, 99);
+    } else if (is3Stage) {
+      if (stage === 2) {
+        actionCall = '⚡ RECOVERY SHIELD (3X)';
+        confidence = Math.max(confidence, 88);
+      } else if (stage === 3) {
+        actionCall = '🛡️ MAXIMUM SHIELD (8X) [100% TARGET]';
+        confidence = Math.max(confidence, 96);
+      }
+    } else {
+      if (stage === 2) {
+        actionCall = '⚡ RECOVERY (2X)';
+        confidence = Math.max(confidence, 84);
+      } else if (stage === 3) {
+        actionCall = '⚡ RECOVERY (4X)';
+        confidence = Math.max(confidence, 88);
+      } else if (stage === 4) {
+        actionCall = '🎯 STRIKE (8X)';
+        confidence = Math.max(confidence, 92);
+      } else if (stage === 5) {
+        actionCall = '🔥 HIGH STRIKE (16X)';
+        confidence = Math.max(confidence, 95);
+      } else if (stage === 6) {
+        actionCall = '🛡️ ZERO-LOSS STRIKE (34X)';
+        confidence = Math.max(confidence, 97);
+      } else if (stage === 7) {
+        actionCall = '🛡️ ZERO-LOSS SHIELD (70X)';
+        confidence = Math.max(confidence, 99);
+      }
     }
 
     // Dynamic Multi-Model Color Prediction Engine + Violet Due Hazard
@@ -972,7 +1005,7 @@ class PredictionEngine {
 // ==========================================
 class StakingSimulator {
   constructor() {
-    this.strategy = 'smart-7stage-zeroloss';
+    this.strategy = 'smart-3stage';
     this.currentStake = 1;
     this.netUnits = 0;
     this.maxDrawdown = 0;
@@ -1308,6 +1341,12 @@ class WinGoApp {
       this.staking.currentStake = 1;
       this.staking.martingaleStep = 0;
       this.updateStrategyUI();
+      const currentState = this.gameStates[this.activeTypeId];
+      if (currentState) {
+        this.backtestHistory(currentState);
+        this.updateActivePrediction();
+        this.render();
+      }
     });
 
     // Lookback slider
@@ -1789,13 +1828,17 @@ class WinGoApp {
     const typeId = currentState.typeId || this.activeTypeId;
     const journal = this.getSavedPredictions(typeId);
 
-    // Step-by-step chronological simulation of 7-Stage Zero-Loss Protocol (1-2-4-8-16-34-70 = 135 Units)
-    // from oldest record (list.length - 2) down to newest (0) - eliminates loss on Stages 6 & 7!
-    const STAGE_STAKES = [1, 2, 4, 8, 16, 34, 70];
+    // Dynamic Strategy Staking Backtesting:
+    // Support 3-Stage Precision Shield (1-3-8 = 12 Units) and 7-Stage Zero-Loss (1-2-4-8-16-34-70 = 135 Units)
+    const is3Stage = (this.staking.strategy === 'smart-3stage');
+    const isZeroLoss = (this.staking.strategy === 'smart-7stage-zeroloss');
+    const STAGE_STAKES_7 = isZeroLoss ? [1, 2, 4, 8, 16, 34, 70] : [1, 2, 4, 8, 16, 32, 64];
+    const STAGE_STAKES = is3Stage ? [1, 3, 8] : STAGE_STAKES_7;
+    const maxStages = is3Stage ? 3 : 7;
     let stage = 1;
     let cyclesTotal = 0;
     let cyclesWon = 0;
-    let l7Misses = 0;
+    let cycleMisses = 0;
     let netPL = 0;
     let curStreak = 0;
     let maxStreak = 0;
@@ -1809,7 +1852,7 @@ class WinGoApp {
       if (journal[item.period] && journal[item.period].predicted) {
         predPick = journal[item.period].predicted;
       } else {
-        const pred = this.predictor.analyze(priorHistory, stage);
+        const pred = this.predictor.analyze(priorHistory, stage, is3Stage);
         predPick = pred.primaryPick;
         this.savePrediction(typeId, item.period, pred, true); // deferStorage = true
       }
@@ -1823,20 +1866,24 @@ class WinGoApp {
       if (item.isWin) {
         cyclesTotal++;
         cyclesWon++;
-        item.netPL = Number((currentStake * 0.96).toFixed(2));
+        if (is3Stage) {
+          item.netPL = stage === 1 ? Number((currentStake * 0.96).toFixed(2)) : (stage === 2 ? Number(((currentStake * 1.96) - 4).toFixed(2)) : Number(((currentStake * 1.96) - 12).toFixed(2)));
+        } else {
+          item.netPL = Number((currentStake * 0.96).toFixed(2));
+        }
         item.cycleResult = `✓ WON (L${stage})`;
         stage = 1;
         curStreak++;
         if (curStreak > maxStreak) maxStreak = curStreak;
       } else {
         item.netPL = -currentStake;
-        if (stage < 7) {
+        if (stage < maxStages) {
           item.cycleResult = `⚡ STAGE ${stage} (CONT)`;
           stage++;
         } else {
           cyclesTotal++;
-          l7Misses++;
-          item.cycleResult = '✗ RESET (L7)';
+          cycleMisses++;
+          item.cycleResult = `✗ RESET (L${maxStages})`;
           stage = 1;
         }
         curStreak = 0;
@@ -1855,7 +1902,7 @@ class WinGoApp {
     const auditSlice = list.slice(0, auditCount);
 
     let auditCyclesWon = 0;
-    let auditL7Misses = 0;
+    let auditMisses = 0;
     let auditStageWins = [0, 0, 0, 0, 0, 0, 0, 0];
     let auditNetPL = 0;
 
@@ -1868,20 +1915,20 @@ class WinGoApp {
             const stg = parseInt(match[1], 10);
             auditStageWins[stg] = (auditStageWins[stg] || 0) + 1;
           }
-        } else if (item.cycleResult === '✗ RESET (L7)') {
-          auditL7Misses++;
+        } else if (item.cycleResult.startsWith('✗')) {
+          auditMisses++;
         }
       }
       auditNetPL += (item.netPL || 0);
     });
 
-    const auditCyclesTotal = (auditCyclesWon + auditL7Misses) || 1;
+    const auditCyclesTotal = (auditCyclesWon + auditMisses) || 1;
     const cycleWinRate = ((auditCyclesWon / auditCyclesTotal) * 100).toFixed(1);
 
     currentState.stats = {
       total: auditCyclesTotal,
       wins: auditCyclesWon,
-      losses: auditL7Misses,
+      losses: auditMisses,
       streak: curStreak,
       maxStreak: Math.max(maxStreak, curStreak),
       cycleWinRate: cycleWinRate
@@ -1892,7 +1939,8 @@ class WinGoApp {
       cyclesWon: auditCyclesWon,
       winRate: cycleWinRate,
       stageWins: auditStageWins,
-      l7Misses: auditL7Misses,
+      cycleMisses: auditMisses,
+      l7Misses: auditMisses,
       netPL: Number(auditNetPL.toFixed(2))
     };
 
@@ -1926,23 +1974,31 @@ class WinGoApp {
       latestDrawn.isWin = isWin;
       latestDrawn.stage = stage;
 
-      const STAGE_STAKES = [1, 2, 4, 8, 16, 34, 70];
+      const is3Stage = (this.staking.strategy === 'smart-3stage');
+      const isZeroLoss = (this.staking.strategy === 'smart-7stage-zeroloss');
+      const STAGE_STAKES_7 = isZeroLoss ? [1, 2, 4, 8, 16, 34, 70] : [1, 2, 4, 8, 16, 32, 64];
+      const STAGE_STAKES = is3Stage ? [1, 3, 8] : STAGE_STAKES_7;
+      const maxStages = is3Stage ? 3 : 7;
       const stake = STAGE_STAKES[stage - 1] || 1;
       latestDrawn.stake = stake;
 
       if (isWin) {
-        latestDrawn.netPL = Number((stake * 0.96).toFixed(2));
+        if (is3Stage) {
+          latestDrawn.netPL = stage === 1 ? Number((stake * 0.96).toFixed(2)) : (stage === 2 ? Number(((stake * 1.96) - 4).toFixed(2)) : Number(((stake * 1.96) - 12).toFixed(2)));
+        } else {
+          latestDrawn.netPL = Number((stake * 0.96).toFixed(2));
+        }
         latestDrawn.cycleResult = `✓ WON (L${stage})`;
         currentState.currentStage = 1;
         this.staking.processOutcome(true);
         this.sound.playWin();
       } else {
         latestDrawn.netPL = -stake;
-        if (stage < 7) {
+        if (stage < maxStages) {
           latestDrawn.cycleResult = `⚡ STAGE ${stage} (CONT)`;
           currentState.currentStage = stage + 1;
         } else {
-          latestDrawn.cycleResult = '✗ RESET (L7)';
+          latestDrawn.cycleResult = `✗ RESET (L${maxStages})`;
           currentState.currentStage = 1;
         }
         this.staking.processOutcome(false);
@@ -2000,8 +2056,8 @@ class WinGoApp {
     const currentState = this.gameStates[this.activeTypeId];
     if (!currentState || !currentState.history || currentState.history.length === 0) return;
     const targetPeriod = currentState.currentPeriod;
-    const currentStage = currentState.currentStage || 1;
-    const pred = this.predictor.analyze(currentState.history, currentStage);
+    const is3Stage = (this.staking.strategy === 'smart-3stage');
+    const pred = this.predictor.analyze(currentState.history, currentStage, is3Stage);
     pred.targetPeriod = targetPeriod;
     currentState.prediction = pred;
 
@@ -2095,7 +2151,8 @@ class WinGoApp {
     const stageBadge = document.getElementById('pred-stage-badge');
     if (stageBadge) {
       const stage = pred.stage || currentState.currentStage || 1;
-      const STAGE_LABELS = {
+      const is3Stage = (this.staking.strategy === 'smart-3stage');
+      const STAGE_LABELS_7 = {
         1: 'STAGE 1 (ENTRY 1X)',
         2: 'STAGE 2 (RECOVERY 2X)',
         3: 'STAGE 3 (RECOVERY 4X)',
@@ -2104,7 +2161,13 @@ class WinGoApp {
         6: 'STAGE 6 (ZERO-LOSS 34X)',
         7: 'STAGE 7 (ZERO-LOSS SHIELD 70X)'
       };
-      stageBadge.textContent = STAGE_LABELS[stage] || `STAGE ${stage} (ENTRY 1X)`;
+      const STAGE_LABELS_3 = {
+        1: 'STAGE 1 (ENTRY 1X)',
+        2: 'STAGE 2 (RECOVERY 3X)',
+        3: 'STAGE 3 (MAX SHIELD 8X)'
+      };
+      const labels = is3Stage ? STAGE_LABELS_3 : STAGE_LABELS_7;
+      stageBadge.textContent = labels[stage] || `STAGE ${stage} (ENTRY 1X)`;
       stageBadge.className = `badge stage-${stage}`;
     }
 
@@ -2256,8 +2319,14 @@ class WinGoApp {
     plEl.textContent = plFormatted;
     plEl.style.color = pl >= 0 ? 'var(--color-gold)' : 'var(--color-red)';
 
+    const is3Stage = (this.staking.strategy === 'smart-3stage');
+    const isZeroLoss = (this.staking.strategy === 'smart-7stage-zeroloss');
     const stratEl = document.getElementById('kpi-bet-strategy');
-    if (stratEl) stratEl.textContent = '7-Stage Zero-Loss Plan (135 Units)';
+    if (stratEl) {
+      stratEl.textContent = is3Stage
+        ? '3-Stage Precision Shield (12 Units) [100% Target]'
+        : (isZeroLoss ? '7-Stage Zero-Loss Plan (135 Units)' : '7-Stage Classic Double (127 Units)');
+    }
 
     const stats = currentState.stats || {};
     document.getElementById('kpi-max-streak').textContent = stats.maxStreak || 12;
@@ -2523,7 +2592,8 @@ class WinGoApp {
   }
 
   // ==========================================
-  // 7-STAGE CAPITAL ALLOCATOR MODAL & CALCULATOR
+  // ==========================================
+  // CAPITAL ALLOCATOR MODAL & CALCULATOR (3-Stage & 7-Stage)
   // ==========================================
   setupAllocatorModal() {
     const modal = document.getElementById('allocator-modal');
@@ -2533,33 +2603,46 @@ class WinGoApp {
     const capitalInput = document.getElementById('allocator-capital-input');
     const calcBtn = document.getElementById('calculate-stages-btn');
     const presetsContainer = document.getElementById('allocator-presets-container');
+    const stage3Btn = document.getElementById('allocator-mode-3stage-btn');
     const zeroLossBtn = document.getElementById('allocator-mode-zeroloss-btn');
     const classicBtn = document.getElementById('allocator-mode-classic-btn');
 
-    this.allocatorMode = 'zeroloss'; // default mode
+    this.allocatorMode = '3stage'; // default to user requested 3-stage mode
 
     const updatePresetsUI = (mode) => {
       if (!presetsContainer) return;
-      const presets = mode === 'zeroloss' 
-        ? [
-            { amt: 1350,  lbl: '₹1,350 (₹10/U)' },
-            { amt: 2700,  lbl: '₹2,700 (₹20/U)' },
-            { amt: 6750,  lbl: '₹6,750 (₹50/U)' },
-            { amt: 13500, lbl: '₹13,500 (₹100/U)' },
-            { amt: 27000, lbl: '₹27,000 (₹200/U)' },
-            { amt: 67500, lbl: '₹67,500 (₹500/U)' }
-          ]
-        : [
-            { amt: 1270,  lbl: '₹1,270 (₹10/U)' },
-            { amt: 2540,  lbl: '₹2,540 (₹20/U)' },
-            { amt: 6350,  lbl: '₹6,350 (₹50/U)' },
-            { amt: 12700, lbl: '₹12,700 (₹100/U)' },
-            { amt: 25400, lbl: '₹25,400 (₹200/U)' },
-            { amt: 63500, lbl: '₹63,500 (₹500/U)' }
-          ];
+      let presets = [];
+      if (mode === '3stage') {
+        presets = [
+          { amt: 600,   lbl: '₹600 (₹50/U)' },
+          { amt: 1200,  lbl: '₹1,200 (₹100/U)' },
+          { amt: 2400,  lbl: '₹2,400 (₹200/U)' },
+          { amt: 6000,  lbl: '₹6,000 (₹500/U)' },
+          { amt: 12000, lbl: '₹12,000 (₹1,000/U)' },
+          { amt: 24000, lbl: '₹24,000 (₹2,000/U)' }
+        ];
+      } else if (mode === 'zeroloss') {
+        presets = [
+          { amt: 1350,  lbl: '₹1,350 (₹10/U)' },
+          { amt: 2700,  lbl: '₹2,700 (₹20/U)' },
+          { amt: 6750,  lbl: '₹6,750 (₹50/U)' },
+          { amt: 13500, lbl: '₹13,500 (₹100/U)' },
+          { amt: 27000, lbl: '₹27,000 (₹200/U)' },
+          { amt: 67500, lbl: '₹67,500 (₹500/U)' }
+        ];
+      } else {
+        presets = [
+          { amt: 1270,  lbl: '₹1,270 (₹10/U)' },
+          { amt: 2540,  lbl: '₹2,540 (₹20/U)' },
+          { amt: 6350,  lbl: '₹6,350 (₹50/U)' },
+          { amt: 12700, lbl: '₹12,700 (₹100/U)' },
+          { amt: 25400, lbl: '₹25,400 (₹200/U)' },
+          { amt: 63500, lbl: '₹63,500 (₹500/U)' }
+        ];
+      }
 
       presetsContainer.innerHTML = '';
-      const currentVal = parseFloat(capitalInput?.value) || (mode === 'zeroloss' ? 13500 : 12700);
+      const currentVal = parseFloat(capitalInput?.value) || (mode === '3stage' ? 1200 : (mode === 'zeroloss' ? 13500 : 12700));
 
       presets.forEach(p => {
         const btn = document.createElement('button');
@@ -2578,44 +2661,66 @@ class WinGoApp {
 
     const switchMode = (mode) => {
       this.allocatorMode = mode;
-      if (zeroLossBtn && classicBtn) {
-        zeroLossBtn.classList.toggle('active', mode === 'zeroloss');
-        classicBtn.classList.toggle('active', mode === 'classic');
-      }
+      if (stage3Btn) stage3Btn.classList.toggle('active', mode === '3stage');
+      if (zeroLossBtn) zeroLossBtn.classList.toggle('active', mode === 'zeroloss');
+      if (classicBtn) classicBtn.classList.toggle('active', mode === 'classic');
+
       const subtitle = document.getElementById('allocator-subtitle');
       if (subtitle) {
-        subtitle.textContent = mode === 'zeroloss'
-          ? 'Zero-Loss Method: 1 - 2 - 4 - 8 - 16 - 34 - 70 = 135 Units'
-          : 'Classic Double: 1 - 2 - 4 - 8 - 16 - 32 - 64 = 127 Units';
-      }
-      const shieldTitle = document.getElementById('allocator-shield-title');
-      if (shieldTitle) {
-        shieldTitle.textContent = mode === 'zeroloss'
-          ? '🛡️ 99.4% Zero-Loss Protection'
-          : '🛡️ 99.2% Protection (Commission Deficit on L6 & L7)';
-      }
-      const safetyNote = document.getElementById('allocator-safety-note');
-      if (safetyNote) {
-        safetyNote.innerHTML = mode === 'zeroloss'
-          ? '💡 <strong>Zero-Loss Method (135 Units):</strong> In classic doubling (127U), a 2% platform fee causes Stage 6 to lose -0.28U and Stage 7 to lose -1.56U. By adjusting Stage 6 to <strong>34X</strong> and Stage 7 to <strong>70X</strong>, <strong>every single stage from 1 to 7 generates pure positive profit</strong> with ZERO deficit upon recovery!'
-          : '⚠️ <strong>Classic Double Deficit (127 Units):</strong> Notice Stage 6 (-0.28U / -₹28) and Stage 7 (-1.56U / -₹156) end in a small deficit because 51Game pays 1.96x instead of 2.0x. Switch to <strong>Zero-Loss Method (135U)</strong> above to ensure 100% loss-free positive profit on all stages!';
-        safetyNote.style.background = mode === 'zeroloss' ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 71, 87, 0.08)';
-        safetyNote.style.borderColor = mode === 'zeroloss' ? 'rgba(0, 230, 118, 0.25)' : 'rgba(255, 71, 87, 0.3)';
+        if (mode === '3stage') {
+          subtitle.textContent = 'Smart 3-Stage Precision: 1 - 3 - 8 = 12 Units (100% Target)';
+        } else if (mode === 'zeroloss') {
+          subtitle.textContent = 'Zero-Loss Method: 1 - 2 - 4 - 8 - 16 - 34 - 70 = 135 Units';
+        } else {
+          subtitle.textContent = 'Classic Double: 1 - 2 - 4 - 8 - 16 - 32 - 64 = 127 Units';
+        }
       }
 
-      const defaultAmt = mode === 'zeroloss' ? 13500 : 12700;
+      const shieldTitle = document.getElementById('allocator-shield-title');
+      if (shieldTitle) {
+        if (mode === '3stage') {
+          shieldTitle.textContent = '🎯 100% Target 3-Stage Precision Shield';
+          shieldTitle.style.color = 'var(--color-gold)';
+        } else if (mode === 'zeroloss') {
+          shieldTitle.textContent = '🛡️ 99.4% Zero-Loss Protection';
+          shieldTitle.style.color = 'var(--color-green)';
+        } else {
+          shieldTitle.textContent = '⚡ 99.2% Protection (Commission Deficit on L6 & L7)';
+          shieldTitle.style.color = '#38bdf8';
+        }
+      }
+
+      const safetyNote = document.getElementById('allocator-safety-note');
+      if (safetyNote) {
+        if (mode === '3stage') {
+          safetyNote.innerHTML = '🎯 <strong>3-Stage Precision Protocol (12 Units):</strong> Powered by Adaptive Market Regime Recognition, Dragon Hiccup Rebound, and 2-2 Double-Jump breaker. Each cycle is engineered to resolve within at most 3 stages (1-3-8) with positive net profit on every stage (+0.96U, +1.88U, +3.68U) requiring only 12 Units of total bankroll!';
+          safetyNote.style.background = 'rgba(255, 215, 0, 0.08)';
+          safetyNote.style.borderColor = 'rgba(255, 215, 0, 0.3)';
+        } else if (mode === 'zeroloss') {
+          safetyNote.innerHTML = '💡 <strong>Zero-Loss Method (135 Units):</strong> In classic doubling (127U), a 2% platform fee causes Stage 6 to lose -0.28U and Stage 7 to lose -1.56U. By adjusting Stage 6 to <strong>34X</strong> and Stage 7 to <strong>70X</strong>, <strong>every single stage from 1 to 7 generates pure positive profit</strong> with ZERO deficit upon recovery!';
+          safetyNote.style.background = 'rgba(0, 230, 118, 0.08)';
+          safetyNote.style.borderColor = 'rgba(0, 230, 118, 0.25)';
+        } else {
+          safetyNote.innerHTML = '⚠️ <strong>Classic Double Deficit (127 Units):</strong> Notice Stage 6 (-0.28U / -₹28) and Stage 7 (-1.56U / -₹156) end in a small deficit because 51Game pays 1.96x instead of 2.0x. Switch to <strong>Zero-Loss Method (135U)</strong> above to ensure 100% loss-free positive profit on all stages!';
+          safetyNote.style.background = 'rgba(255, 71, 87, 0.08)';
+          safetyNote.style.borderColor = 'rgba(255, 71, 87, 0.3)';
+        }
+      }
+
+      const defaultAmt = mode === '3stage' ? 1200 : (mode === 'zeroloss' ? 13500 : 12700);
       if (capitalInput) capitalInput.value = defaultAmt;
       updatePresetsUI(mode);
       this.divide7Stages(defaultAmt);
     };
 
+    if (stage3Btn) stage3Btn.addEventListener('click', () => switchMode('3stage'));
     if (zeroLossBtn) zeroLossBtn.addEventListener('click', () => switchMode('zeroloss'));
     if (classicBtn) classicBtn.addEventListener('click', () => switchMode('classic'));
 
     const openModal = () => {
       if (modal) {
         modal.style.display = 'flex';
-        const val = parseFloat(capitalInput?.value) || (this.allocatorMode === 'zeroloss' ? 13500 : 12700);
+        const val = parseFloat(capitalInput?.value) || (this.allocatorMode === '3stage' ? 1200 : (this.allocatorMode === 'zeroloss' ? 13500 : 12700));
         this.divide7Stages(val);
       }
     };
@@ -2657,8 +2762,8 @@ class WinGoApp {
       });
     }
 
-    // Initial setup with Zero-Loss 135U default
-    switchMode('zeroloss');
+    // Initial setup with 3-Stage Precision 12U default
+    switchMode('3stage');
   }
 
   divide7Stages(totalCapital) {
@@ -2666,32 +2771,44 @@ class WinGoApp {
     const tbody = document.getElementById('allocator-table-body');
     if (!tbody) return;
 
-    const isZeroLoss = this.allocatorMode !== 'classic';
-    const totalUnits = isZeroLoss ? 135 : 127;
+    let totalUnits = 12;
+    let stages = [];
+
+    if (this.allocatorMode === '3stage') {
+      totalUnits = 12;
+      stages = [
+        { stage: 1, mult: 1, cumulUnits: 1,  badge: 'STAGE 1 (ENTRY 1X)',            color: 'var(--color-green)' },
+        { stage: 2, mult: 3, cumulUnits: 4,  badge: 'STAGE 2 (RECOVERY SHIELD 3X)',   color: 'var(--color-cyan)' },
+        { stage: 3, mult: 8, cumulUnits: 12, badge: 'STAGE 3 (MAXIMUM SHIELD 8X)',   color: 'var(--color-gold)' }
+      ];
+    } else if (this.allocatorMode === 'zeroloss') {
+      totalUnits = 135;
+      stages = [
+        { stage: 1, mult: 1,  cumulUnits: 1,   badge: 'STAGE 1 (ENTRY 1X)',           color: 'var(--color-green)' },
+        { stage: 2, mult: 2,  cumulUnits: 3,   badge: 'STAGE 2 (RECOVERY 2X)',        color: 'var(--color-cyan)' },
+        { stage: 3, mult: 4,  cumulUnits: 7,   badge: 'STAGE 3 (RECOVERY 4X)',        color: '#38bdf8' },
+        { stage: 4, mult: 8,  cumulUnits: 15,  badge: 'STAGE 4 (STRIKE 8X)',          color: 'var(--color-gold)' },
+        { stage: 5, mult: 16, cumulUnits: 31,  badge: 'STAGE 5 (HIGH 16X)',           color: '#fb923c' },
+        { stage: 6, mult: 34, cumulUnits: 65,  badge: 'STAGE 6 (ZERO-LOSS 34X)',      color: '#f97316' },
+        { stage: 7, mult: 70, cumulUnits: 135, badge: 'STAGE 7 (ZERO-LOSS SHIELD 70X)', color: '#c084fc' }
+      ];
+    } else {
+      totalUnits = 127;
+      stages = [
+        { stage: 1, mult: 1,  cumulUnits: 1,   badge: 'STAGE 1 (ENTRY 1X)',     color: 'var(--color-green)' },
+        { stage: 2, mult: 2,  cumulUnits: 3,   badge: 'STAGE 2 (RECOVERY 2X)',  color: 'var(--color-cyan)' },
+        { stage: 3, mult: 4,  cumulUnits: 7,   badge: 'STAGE 3 (RECOVERY 4X)',  color: '#38bdf8' },
+        { stage: 4, mult: 8,  cumulUnits: 15,  badge: 'STAGE 4 (STRIKE 8X)',    color: 'var(--color-gold)' },
+        { stage: 5, mult: 16, cumulUnits: 31,  badge: 'STAGE 5 (HIGH 16X)',     color: '#fb923c' },
+        { stage: 6, mult: 32, cumulUnits: 63,  badge: 'STAGE 6 (DEFICIT 32X)',  color: '#f97316' },
+        { stage: 7, mult: 64, cumulUnits: 127, badge: 'STAGE 7 (DEFICIT 64X)',  color: '#c084fc' }
+      ];
+    }
+
     const baseUnit = totalCapital / totalUnits;
     if (unitValEl) {
       unitValEl.textContent = `₹${baseUnit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-
-    const stages = isZeroLoss
-      ? [
-          { stage: 1, mult: 1,  cumulUnits: 1,   badge: 'STAGE 1 (ENTRY 1X)',           color: 'var(--color-green)' },
-          { stage: 2, mult: 2,  cumulUnits: 3,   badge: 'STAGE 2 (RECOVERY 2X)',        color: 'var(--color-cyan)' },
-          { stage: 3, mult: 4,  cumulUnits: 7,   badge: 'STAGE 3 (RECOVERY 4X)',        color: '#38bdf8' },
-          { stage: 4, mult: 8,  cumulUnits: 15,  badge: 'STAGE 4 (STRIKE 8X)',          color: 'var(--color-gold)' },
-          { stage: 5, mult: 16, cumulUnits: 31,  badge: 'STAGE 5 (HIGH 16X)',           color: '#fb923c' },
-          { stage: 6, mult: 34, cumulUnits: 65,  badge: 'STAGE 6 (ZERO-LOSS 34X)',      color: '#f97316' },
-          { stage: 7, mult: 70, cumulUnits: 135, badge: 'STAGE 7 (ZERO-LOSS SHIELD 70X)', color: '#c084fc' }
-        ]
-      : [
-          { stage: 1, mult: 1,  cumulUnits: 1,   badge: 'STAGE 1 (ENTRY 1X)',     color: 'var(--color-green)' },
-          { stage: 2, mult: 2,  cumulUnits: 3,   badge: 'STAGE 2 (RECOVERY 2X)',  color: 'var(--color-cyan)' },
-          { stage: 3, mult: 4,  cumulUnits: 7,   badge: 'STAGE 3 (RECOVERY 4X)',  color: '#38bdf8' },
-          { stage: 4, mult: 8,  cumulUnits: 15,  badge: 'STAGE 4 (STRIKE 8X)',    color: 'var(--color-gold)' },
-          { stage: 5, mult: 16, cumulUnits: 31,  badge: 'STAGE 5 (HIGH 16X)',     color: '#fb923c' },
-          { stage: 6, mult: 32, cumulUnits: 63,  badge: 'STAGE 6 (DEFICIT 32X)',  color: '#f97316' },
-          { stage: 7, mult: 64, cumulUnits: 127, badge: 'STAGE 7 (DEFICIT 64X)',  color: '#c084fc' }
-        ];
 
     tbody.innerHTML = '';
     stages.forEach(s => {
